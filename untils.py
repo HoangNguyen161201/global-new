@@ -16,6 +16,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import base64
 import ffmpeg
+from kokoro import KPipeline
+import numpy as np
+
 
 def generate_content(content):
     genai.configure(api_key="AIzaSyArae1nyjhAiRedUMkrUWd7p_-BJglXBNU")
@@ -429,9 +432,6 @@ def generate_voice_kokoro(text, out_path):
         for key, item in enumerate(text_arr):
             audio_path = f'./audio-{key}.mp3'
             audio_paths.append(audio_path)
-            from kokoro import KPipeline
-            import numpy as np
-            import ffmpeg
 
             pipeline = KPipeline(lang_code='a')  # <= make sure lang_code matches voice
 
@@ -467,6 +467,9 @@ def generate_voice_kokoro(text, out_path):
         final_clip.write_audiofile(out_path)
         return True
             
-    except:
+    except NameError:
+        
       print('An exception occurred')
+      print(NameError)
       return False
+    
