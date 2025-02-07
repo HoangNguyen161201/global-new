@@ -324,6 +324,16 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     )
     browser.find_element(By.ID, 'next-button').click()
     time.sleep(2)
+
+    while True:
+        element = browser.find_elements(By.XPATH, '//*[@check-status="UPLOAD_CHECKS_DATA_COPYRIGHT_STATUS_COMPLETED" or @check-status="UPLOAD_CHECKS_DATA_COPYRIGHT_STATUS_STARTED"]')
+        
+        if element:
+            break  # Thoát vòng lặp nếu tìm thấy
+
+        print("Chưa tìm thấy, tiếp tục kiểm tra...")
+        time.sleep(2)  # Đợi 2 giây trước khi kiểm tra lại
+
     browser.find_element(By.ID, 'next-button').click()
     time.sleep(3)
 
