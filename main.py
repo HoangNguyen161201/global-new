@@ -18,9 +18,9 @@ import pyglet
 
 
 # print(get_all_links())
-#delete_link('https://www.theguardian.com/world/2025/jan/22/israeli-forces-surround-palestinian-hospital-refugee-camp-west-bank')
-# insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
-#time.sleep(60)
+# delete_link('https://www.theguardian.com/us-news/2025/feb/08/trump-and-japanese-pm-ishiba-talk-tariffs-and-vow-to-stand-against-chinese-aggression')
+# # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
+# time.sleep(60)
 
 
 # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
@@ -172,13 +172,13 @@ while not is_generate_voice_error:
 
                     # generate title by ai
                     print('generate title')
-                    title = generate_content(f'hãy đặt lại title youtube cho tôi bằng tiếng anh không quá 86 ký tự: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
-                    if len(title) > 86:
-                        title = title[:86]
+                    title = generate_content(f'hãy đặt lại title youtube cho tôi bằng tiếng anh không quá 100 ký tự: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    if len(title) > 100:
+                        title = title[:100]
                     print('nguyen quang hpang')
                     print(title)
                     title_slug = slugify(str(title))
-                    title_youtube = f'{title} | Global New'
+                    title_youtube = f'{title}'
                     print('huy')
                     # generate content by ai
                     print(f'generate content {content.__len__()}')
@@ -189,7 +189,7 @@ while not is_generate_voice_error:
                     # generate tags
                     print(f'generate tags')
                     tags = generate_content(f'hãy gợi ý 15 tags (không phải hastag nha, không ghi dính liền với nhau, không cần sắp xếp theo số thứ tự, không có dấu #, tổng các tags không quá 290 ký tự, đồng thời các tag ngăn cách nhau bởi dấu phẩy như vầy tag1, tag2, tag3, ....) quan trọng để tui gắn vào video dài trên youtube để có nhiều người search. title của video là {title}, content là {content}')
-                    
+                    description = generate_content(f'hãy tóm tắt lại đoạn văn sau bao gồm các ý quan trọng bằng tiếng anh để gắn vào phần mô tả youtube để seo, và có độ dài không quá 600 ký tự: {content}')
                     # Chuyển chuỗi thành list các tag
                     tag_list = tags.split(', ')
                     result = ""
@@ -254,7 +254,7 @@ while not is_generate_voice_error:
                     browser.quit()
                     
                     print('upload video to youtube')
-                    des_youtube = f"{content.split('.')[0]}\n\n🎥 Reference source: {current_link}\n\nSubscribe to Global New on YouTube: https://bit.ly/40NIG5V\n\n\n(tags):\n{result}"
+                    des_youtube = f"{title}\n{description}\n\n(tags):\n{result}"
                     upload_yt(
                         "C:/Program Files/Google/Chrome/Application/chrome.exe",
                         "C:/Path/To/Chrome/news-us",
