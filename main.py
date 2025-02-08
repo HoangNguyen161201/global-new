@@ -254,7 +254,7 @@ while not is_generate_voice_error:
                     browser.quit()
                     
                     print('upload video to youtube')
-                    des_youtube = f"{content.split('.')[0]}\n\nSubscribe to Global New on YouTube: https://bit.ly/40NIG5V\n\n\n(tags):\n{result}"
+                    des_youtube = f"{content.split('.')[0]}\n\n🎥 Reference source: {current_link}\n\nSubscribe to Global New on YouTube: https://bit.ly/40NIG5V\n\n\n(tags):\n{result}"
                     upload_yt(
                         "C:/Program Files/Google/Chrome/Application/chrome.exe",
                         "C:/Path/To/Chrome/news-us",
