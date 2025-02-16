@@ -18,29 +18,12 @@ import subprocess
 from datetime import datetime
 import pyglet
 
-
-# upload_yt(
-#     "C:/Path/To/Chrome/news-us",
-#     "Inflation Soars Despite Trump's Price Drop Promise",
-#     "Inflation Soars Despite Trump's Price Drop Promise",
-#     f'news, Inflation, CPI, Consumer Price Index, Trump, Price Increase, Economic Policy, US Economy, Presidential Promises, Campaign Promises, Cost of Living, Inflation Rate, Macroeconomics, Economic Indicators, Political Promises,  Election 2024, breaking news, current events,',
-#     os.path.abspath(f'./videos/video-99/tasmania-s-devastating-fires-weeks-of-burning-wilderness.mp4'),
-#     os.path.abspath(f"./videos/video-99/thumbnail.jpg"),
-# )
-# time.sleep(1000000)
-
 # print(get_all_links())
 # delete_link('https://www.theguardian.com/world/2025/feb/15/uk-based-lawyers-for-hong-kong-activist-jimmy-lai-targeted-by-chinese-state')
 # # # # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
 # time.sleep(60)
 
-
-# chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-# user_data_dir = "C:/Path/To/Chrome/news-us"
-# subprocess.Popen([chrome_path, f'--remote-debugging-port=9223', f'--user-data-dir={user_data_dir}'])
-# time.sleep(100000)
-
-
+connect_db()
 # is_generate_voice_success = generate_voice_google(
 #     'right right right right right right right right right',
 #     f"./content-voice.mp3",
@@ -50,11 +33,12 @@ import pyglet
 
 
 is_generate_voice_error = False 
-connect_db()
 while not is_generate_voice_error:
     count_folder = count_folders('./videos')
     path_folder = f'./videos/video-{count_folder}'
     current_link = None
+
+    print('nguyen quang hoang')
 
     try:
         while not is_generate_voice_error:

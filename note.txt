@@ -70,6 +70,7 @@ mdurl                        0.1.2
 MetaTrader5                  5.0.4424
 misaki                       0.7.9
 moviepy                      2.1.1
+moviepy                      1.0.3 (linux)
 mpmath                       1.3.0
 multidict                    6.1.0
 munch                        4.0.0
@@ -77,6 +78,7 @@ murmurhash                   1.0.12
 networkx                     3.4.2
 num2words                    0.5.14
 numpy                        1.26.4
+numpy                        1.24.4 (linux)
 opencv-python                4.11.0.86
 outcome                      1.3.0.post0
 packaging                    24.2
