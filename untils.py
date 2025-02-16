@@ -14,11 +14,17 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import base64
 import ffmpeg
-from kokoro import KPipeline
 import numpy as np
-
+os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
+os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG\espeak-ng.exe"
+from Kokoro.models import build_model
+import torch
+# 3️⃣ Call generate, which returns 24khz audio and the phonemes used
+from Kokoro.kokoro import generate
 
 def generate_content(content):
     genai.configure(api_key="AIzaSyArae1nyjhAiRedUMkrUWd7p_-BJglXBNU")
@@ -221,26 +227,37 @@ def generate_thumbnail(img_path, img_blur_path, img_person_path, out_path, text)
     background_2.save(out_path)
 
 
-def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, video_thumbnail):
+def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbnail):
+    ### dùng để tạo ra 1 user
     # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
     # user_data_dir = "C:/Path/To/Chrome/news-us"
+    # subprocess.Popen([chrome_path, f'--remote-debugging-port=9223', f'--user-data-dir={user_data_dir}'])
+    # time.sleep(5)
 
-    subprocess.Popen([chrome_path, f'--remote-debugging-port=9223', f'--user-data-dir={user_data_dir}'])
-    time.sleep(5)
 
+    # Tạo đối tượng ChromeOptions
     chrome_options = Options()
-    chrome_options.add_experimental_option("debuggerAddress", "localhost:9223")
 
-    # Tạo đối tượng driver
-    browser = webdriver.Chrome(options=chrome_options)
+    # Chỉ định đường dẫn đến thư mục user data
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    chrome_options.add_argument(f"user-data-dir={user_data_dir}")
+    chrome_options.add_argument("profile-directory=Default")  # Nếu bạn muốn sử dụng profile mặc định
+    chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
+    chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
+
+    # Sử dụng Service để chỉ định ChromeDriver
+    service = Service(ChromeDriverManager().install())
+
+
+    # Khởi tạo WebDriver với các tùy chọn
+    browser = webdriver.Chrome(service=service, options=chrome_options)
 
     browser.get("https://studio.youtube.com/")
 
     # await browser load end
-    WebDriverWait(browser, 10).until(
+    WebDriverWait(browser, 100).until(
         EC.presence_of_all_elements_located((By.ID, 'create-icon'))
     )
-
 
 
     browser.find_element(By.ID, 'create-icon').click()
@@ -249,12 +266,16 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     browser.find_element(By.ID, 'text-item-0').click()
     time.sleep(3)
 
+    print('fgfg fg fg')
+
     # upload video
+    print('upload video in youtube')
     file_input = browser.find_elements(By.TAG_NAME, 'input')[1]
     file_input.send_keys(video_path)
     time.sleep(3)
 
     # upload thumbnail
+    print('upload thumbnail in youtube')
     WebDriverWait(browser, 10).until(
         EC.presence_of_all_elements_located((By.ID, 'file-loader'))
     )
@@ -263,6 +284,7 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     time.sleep(3)
 
     # enter title
+    print('nhập title in youtube')
     WebDriverWait(browser, 10).until(
         EC.presence_of_all_elements_located((By.ID, 'textbox'))
     )
@@ -272,6 +294,7 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     time.sleep(1)
 
     # enter description
+    print('nhập description in youtube')
     des_input = browser.find_elements(By.ID, 'textbox')[1]
     des_input.clear()
     des_input.send_keys(description)
@@ -294,6 +317,7 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     time.sleep(2)
 
     # enter tags
+    print('nhập tags in youtube')
     WebDriverWait(browser, 10).until(
         EC.presence_of_all_elements_located((By.ID, 'text-input'))
     )
@@ -341,6 +365,7 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
     time.sleep(3)
 
     # done
+    print('upload video in youtube thành công')
     WebDriverWait(browser, 10).until(
         EC.presence_of_all_elements_located((By.ID, 'done-button'))
     )
@@ -348,7 +373,6 @@ def upload_yt(chrome_path, user_data_dir, title, description, tags, video_path, 
 
     time.sleep(10)
     browser.quit()
-    subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
 
 
 def split_text(text, max_length=500):
@@ -443,34 +467,31 @@ def generate_voice_kokoro(text, out_path):
             audio_path = f'./audio-{key}.mp3'
             audio_paths.append(audio_path)
 
-            pipeline = KPipeline(lang_code='a')  # <= make sure lang_code matches voice
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            MODEL = build_model('./Kokoro/kokoro-v0_19.pth', device)
+            VOICE_NAME = [
+                'af', # Default voice is a 50-50 mix of Bella & Sarah
+                'af_bella', 'af_sarah', 'am_adam', 'am_michael',
+                'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
+                'af_nicole', 'af_sky',
+            ][0]
+            VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=True).to(device)
+            print(f'Loaded voice: {VOICE_NAME}')
 
-            # 1️⃣ Chạy pipeline và ghép tất cả các đoạn âm thanh
-            generator = pipeline(
-                item, voice='af_heart',  # <= change voice here
-                speed=1, split_pattern=r'\n+'
-            )
+            audio, out_ps = generate(MODEL, item, VOICEPACK, lang=VOICE_NAME[0])
 
-            # Ghép tất cả các đoạn âm thanh thành một numpy array duy nhất
-            audio = np.concatenate([audio for _, _, audio in generator])
-
-            # 3️⃣ Sử dụng ffmpeg để lưu file mp3
             process = (
-                ffmpeg
-                .input('pipe:0', format='f32le', ac=1, ar='24000')  # Định dạng đầu vào
-                .output(audio_path, acodec='libmp3lame', audio_bitrate='192k')
-                .overwrite_output()
-                .run_async(pipe_stdin=True)
-            )
+                            ffmpeg
+                            .input('pipe:0', format='f32le', ac=1, ar='24000')  # Định dạng đầu vào
+                            .output(audio_path, acodec='libmp3lame', audio_bitrate='192k')
+                            .overwrite_output()
+                            .run_async(pipe_stdin=True)
+                        )
 
             # Gửi dữ liệu âm thanh vào ffmpeg
             process.stdin.write(audio.astype(np.float32).tobytes())
             process.stdin.close()
             process.wait()
-
-
-            
-        
 
         clips = [AudioFileClip(audio) for audio in audio_paths]
         final_clip = concatenate_audioclips(clips)

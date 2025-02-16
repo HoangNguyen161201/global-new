@@ -2,6 +2,9 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
 import time
 import random
 import os
@@ -16,10 +19,19 @@ from datetime import datetime
 import pyglet
 
 
+# upload_yt(
+#     "C:/Path/To/Chrome/news-us",
+#     "Inflation Soars Despite Trump's Price Drop Promise",
+#     "Inflation Soars Despite Trump's Price Drop Promise",
+#     f'news, Inflation, CPI, Consumer Price Index, Trump, Price Increase, Economic Policy, US Economy, Presidential Promises, Campaign Promises, Cost of Living, Inflation Rate, Macroeconomics, Economic Indicators, Political Promises,  Election 2024, breaking news, current events,',
+#     os.path.abspath(f'./videos/video-99/tasmania-s-devastating-fires-weeks-of-burning-wilderness.mp4'),
+#     os.path.abspath(f"./videos/video-99/thumbnail.jpg"),
+# )
+# time.sleep(1000000)
 
 # print(get_all_links())
-# delete_link('https://www.theguardian.com/us-news/2025/feb/08/trump-and-japanese-pm-ishiba-talk-tariffs-and-vow-to-stand-against-chinese-aggression')
-# # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
+# delete_link('https://www.theguardian.com/world/2025/feb/15/uk-based-lawyers-for-hong-kong-activist-jimmy-lai-targeted-by-chinese-state')
+# # # # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
 # time.sleep(60)
 
 
@@ -46,7 +58,12 @@ while not is_generate_voice_error:
 
     try:
         while not is_generate_voice_error:
-            browser = webdriver.Chrome()
+            # Tạo đối tượng ChromeOptions
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
+            chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
+
+            browser = webdriver.Chrome(options=chrome_options)
             browser.get('https://www.theguardian.com/world')
 
             # await browser load end dcr-ezvrjj
@@ -82,6 +99,7 @@ while not is_generate_voice_error:
                 )
 
 
+
                 try:
                     time.sleep(5)
                     browser.execute_script("arguments[0].remove()", browser.find_element(By.CLASS_NAME, 'dcr-pvn4wq'))
@@ -96,9 +114,23 @@ while not is_generate_voice_error:
                     print('khong co video')
 
                 if not is_video:
-                    # title
-                    title = browser.find_element(By.TAG_NAME, 'h1').text
+                    # Lấy thẻ meta có name="description"
+                    meta_title = browser.find_element("xpath", '//meta[@property="og:title"]')
+                    # Lấy giá trị của thuộc tính content
+                    title = str(meta_title.get_attribute("content"))
                     print(title)
+
+                    # Lấy thẻ meta có name="description"
+                    meta_description = browser.find_element("xpath", '//meta[@name="description"]')
+                    # Lấy giá trị của thuộc tính content
+                    description = str(meta_description.get_attribute("content"))
+                    print(description)
+                   
+                    # Lấy thẻ meta có name="description"
+                    meta_tags = browser.find_element("xpath", '//meta[@property="article:tag"]')
+                    # Lấy giá trị của thuộc tính content
+                    tags = str(meta_tags.get_attribute("content"))
+                    print(tags)
 
                     # remove ---
                     browser.execute_script("""
@@ -172,14 +204,17 @@ while not is_generate_voice_error:
 
                     # generate title by ai
                     print('generate title')
-                    title = generate_content(f'hãy đặt lại title youtube cho tôi bằng tiếng anh không quá 100 ký tự: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    title = generate_content(f'hãy viết lại title bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, không được có dấu : trong title, trên 50 ký tự và dưới 100 ký tự để cho tôi đặt title cho video youtube của tôi: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    print(title)
+
+                    print('generate description')
+                    description = generate_content(f'tôi đang có title là: {title}. tag là: {tags}. description ban đầu là: {description}. Hãy viết lại description bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, để cho tôi gắn vào phần mô tả cho video youtube của tôi: {description}, trả ra description cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    print(description)
+
                     if len(title) > 100:
                         title = title[:100]
-                    print('nguyen quang hpang')
-                    print(title)
                     title_slug = slugify(str(title))
-                    title_youtube = f'{title}'
-                    print('huy')
+
                     # generate content by ai
                     print(f'generate content {content.__len__()}')
 
@@ -187,11 +222,8 @@ while not is_generate_voice_error:
                     print(content)
                 
                     # generate tags
-                    print(f'generate tags')
-                    tags = generate_content(f'hãy gợi ý 15 tags (không phải hastag nha, không ghi dính liền với nhau, không cần sắp xếp theo số thứ tự, không có dấu #, tổng các tags không quá 290 ký tự, đồng thời các tag ngăn cách nhau bởi dấu phẩy như vầy tag1, tag2, tag3, ....) quan trọng để tui gắn vào video dài trên youtube để có nhiều người search. title của video là {title}, content là {content}')
-                    description = generate_content(f'hãy tóm tắt lại đoạn văn sau bao gồm các ý quan trọng bằng tiếng anh để gắn vào phần mô tả youtube để seo, và có độ dài không quá 600 ký tự: {content}')
                     # Chuyển chuỗi thành list các tag
-                    tag_list = tags.split(', ')
+                    tag_list = tags.split(',')
                     result = ""
                     length = 0
 
@@ -254,13 +286,12 @@ while not is_generate_voice_error:
                     browser.quit()
                     
                     print('upload video to youtube')
-                    des_youtube = f"{title}\n{description}\n\n(tags):\n{result}"
+                    des_youtube = f"{description}\n\n(tags):\n{result}"
                     upload_yt(
-                        "C:/Program Files/Google/Chrome/Application/chrome.exe",
                         "C:/Path/To/Chrome/news-us",
-                        title_youtube,
+                        title,
                         des_youtube,
-                        f'{result},',
+                        f'news, {result}, breaking news, current events,',
                         os.path.abspath(f'{path_folder}/{title_slug}.mp4'),
                         os.path.abspath(f"{path_folder}/thumbnail.jpg"),
                     )
