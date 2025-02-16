@@ -1,2 +1,3 @@
-2025/02/16-16:09:50.087 65b4 Creating DB C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news\Default\Session Storage since it was missing.
-2025/02/16-16:09:50.107 65b4 Reusing MANIFEST C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news\Default\Session Storage/MANIFEST-000001
+2025/02/16-16:10:07.657 4d74 Reusing MANIFEST C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news\Default\Session Storage/MANIFEST-000001
+2025/02/16-16:10:07.659 4d74 Recovering log #3
+2025/02/16-16:10:07.664 4d74 Reusing old log C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news\Default\Session Storage/000003.log 

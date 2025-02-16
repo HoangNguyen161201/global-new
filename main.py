@@ -19,7 +19,7 @@ from datetime import datetime
 import pyglet
 
 # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-# user_data_dir = r"C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news"
+# user_data_dir = r"C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\user\read-news"
 # subprocess.Popen([chrome_path, f'--user-data-dir={user_data_dir}'])
 # time.sleep(5)
 
@@ -46,7 +46,9 @@ while not is_generate_voice_error:
     try:
         while not is_generate_voice_error:
             # Tạo đối tượng ChromeOptions
+            user_read_news_data_dir = r"C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\user\read-news"
             chrome_options = Options()
+            chrome_options.add_argument(f"user-data-dir={user_read_news_data_dir}")
             chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
             chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
 
