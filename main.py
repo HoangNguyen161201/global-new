@@ -19,9 +19,8 @@ from datetime import datetime
 import pyglet
 
 # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-# user_data_dir = "C:/Path/To/Chrome/news"
+# user_data_dir = r"C:\Users\hoang\OneDrive\Desktop\code\tool-news-us\read-news"
 # subprocess.Popen([chrome_path, f'--user-data-dir={user_data_dir}'])
-# print('fff')
 # time.sleep(5)
 
 # print(get_all_links())
