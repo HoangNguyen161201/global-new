@@ -138,7 +138,7 @@ def concact_content_videos(audio_path, video_path_list, out_path):
 def count_folders(path):
     # Kiểm tra xem đường dẫn tồn tại không
     if not os.path.exists(path):
-        print("Đường dẫn không tồn tại")
+        print(fr"Đường dẫn không tồn tại {path}")
         return
     
     # Đếm số lượng thư mục

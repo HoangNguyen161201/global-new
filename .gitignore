@@ -1,3 +1,5 @@
 videos/
 **/.venv/
 .venv/
+
+./public/kokoro.mp4

@@ -18,6 +18,12 @@ import subprocess
 from datetime import datetime
 import pyglet
 
+# chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
+# user_data_dir = "C:/Path/To/Chrome/news"
+# subprocess.Popen([chrome_path, f'--user-data-dir={user_data_dir}'])
+# print('fff')
+# time.sleep(5)
+
 # print(get_all_links())
 # delete_link('https://www.theguardian.com/world/2025/feb/15/uk-based-lawyers-for-hong-kong-activist-jimmy-lai-targeted-by-chinese-state')
 # # # # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
@@ -37,8 +43,6 @@ while not is_generate_voice_error:
     count_folder = count_folders('./videos')
     path_folder = f'./videos/video-{count_folder}'
     current_link = None
-
-    print('nguyen quang hoang')
 
     try:
         while not is_generate_voice_error:
