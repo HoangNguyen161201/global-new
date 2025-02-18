@@ -1,3 +1,5 @@
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -49,8 +51,20 @@ while not is_generate_voice_error:
             chrome_options = Options()
             chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
             chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
- 
+
+            ## nếu là linux thì thêm
+            # chrome_options.binary_location = "/usr/bin/chromium-browser"
+            # user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
+            # chrome_options.add_argument(f"user-agent={user_agent}")
+            # chrome_options.add_argument("--remote-debugging-port=9224")
+            # chrome_options.add_argument("--no-sandbox")
+
+
+            # nếu linux:
+            #service = Service(ChromeDriverManager(driver_version="133.0.6943.53").install())
+            #browser = webdriver.Chrome(service=service, options=chrome_options)
             browser = webdriver.Chrome(options=chrome_options)
+            
             browser.get('https://www.theguardian.com/world')
 
             # await browser load end dcr-ezvrjj

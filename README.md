@@ -1,11 +1,22 @@
 # tool-news-linux
 
+vpsdime.com
+
 1 cấu hình:
 - cập nhật lại vps: sudo apt update
 - cài đặt git: sudo apt install git (git --version)
 - cài đặt python: sudo apt install python3 (python3 --version)
 - cài đặt pip: sudo apt install python3-pip (pip3 --version)
-- tải chrome: sudo apt install chromium-browser
+- sudo apt install libglib2.0-0 (nếu cv2 không chạy được)
+- sudo apt install libgl1-mesa-glx (nếu cv2 không chạy được)
+- tải chrome: sudo apt install chromium-browser, nếu không chạy được phải tải thêm các thư viện phụ thuộc:
+-- sudo apt install xdg-utils
+-- sudo apt install -y libx11-xcb1 libglu1-mesa libxss1
+-- tính năng khác:
+--- which chromium-browser (xem path)
+--- chromium-browser --version (xem version để dán vào main)
+- sudo apt install -y libnss3 libgdk-pixbuf2.0-0 libatk-bridge2.0-0 libatk1.0-0 libgbm1
+
 - tải espeak-ng: sudo apt-get install espeak-ng
 - tải screen: sudo apt install screen (
     tạo: screen -S <name>
@@ -30,3 +41,7 @@ python3 main.py
 5 tải kokoro-82m:
 - cd global-new
 - git clone https://github.com/zboyles/Kokoro-82M.git
+
+6 khác:
+- rm -r tên_thư_mục: xóa tên thư mục
+- mv thumuc_cu thumuc_moi: đổi tên thư mục
