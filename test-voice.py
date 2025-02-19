@@ -1,0 +1,3 @@
+from untils import generate_voice_kokoro
+
+generate_voice_kokoro("Glencore's Potential Departure from London Stock Exchange: A Significant Blow to UK Markets Glencore, the Swiss-based commodities giant, is contemplating a relocation of its primary share listing from the London Stock Exchange (LSE), a move that would deliver a substantial blow to the UK's already struggling blue-chip market. This consideration comes amidst a series of high-profile departures, prompting concerns about London's competitiveness as a leading global exchange. The company's statement acknowledges", './t.mp3')

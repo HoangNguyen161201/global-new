@@ -475,7 +475,7 @@ def generate_voice_kokoro(text, out_path):
                 'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
                 'af_nicole', 'af_sky',
             ][0]
-            VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=True).to(device)
+            VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=False).to(device)
             print(f'Loaded voice: {VOICE_NAME}')
 
             audio, out_ps = generate(MODEL, item, VOICEPACK, lang=VOICE_NAME[0])

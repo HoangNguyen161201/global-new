@@ -16,9 +16,6 @@ vpsdime.com
 --- which chromium-browser (xem path)
 --- chromium-browser --version (xem version để dán vào main)
 - sudo apt install -y libnss3 libgdk-pixbuf2.0-0 libatk-bridge2.0-0 libatk1.0-0 libgbm1
-- tải font microsoft cho linux:
--- sudo apt install winetricks
--- winetricks corefonts
 
 - tải espeak-ng: sudo apt-get install espeak-ng
 - tải screen: sudo apt install screen (
