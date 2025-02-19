@@ -180,7 +180,7 @@ def generate_thumbnail(img_path, img_blur_path, img_person_path, out_path, text)
     
        # Thêm văn bản vào ảnh
     draw = ImageDraw.Draw(background_2)
-    font = ImageFont.truetype("arial.ttf", 55)  # Đặt font và kích thước font
+    font = ImageFont.truetype("./fonts/arial/arial.ttf", 55)  # Đặt font và kích thước font
     max_width = 1350
     lines = []
 

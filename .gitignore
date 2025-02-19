@@ -1,5 +1,8 @@
+**/videos/
 videos/
 **/.venv/
 .venv/
-
 ./public/kokoro.mp4
+./mydatabase.db
+**/__pycache__/
+__pycache__/
