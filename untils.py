@@ -531,6 +531,7 @@ def generate_voice_kokoro_pip(text, out_path):
         clips = [AudioFileClip(audio) for audio in audio_paths]
         final_clip = concatenate_audioclips(clips)
         final_clip.write_audiofile(out_path)
+        return True
     except:
       print('generate voice error')
       return False 
