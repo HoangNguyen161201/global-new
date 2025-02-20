@@ -10,7 +10,7 @@ from selenium.webdriver.chrome.options import Options
 import time
 import random
 import os
-from untils import generate_content, generate_voice_kokoro, generate_image, generate_video_by_image, concact_content_videos, count_folders, generate_thumbnail, upload_yt
+from untils import generate_content, generate_voice_kokoro_pip, generate_image, generate_video_by_image, concact_content_videos, count_folders, generate_thumbnail, upload_yt
 import concurrent.futures
 from data import gif_paths, person_img_paths
 from slugify import slugify
@@ -27,7 +27,7 @@ import pyglet
 
 # print(get_all_links())
 # delete_link('https://www.theguardian.com/world/2025/feb/15/uk-based-lawyers-for-hong-kong-activist-jimmy-lai-targeted-by-chinese-state')
-# # # # insert_link('https://www.theguardian.com/world/article/2024/may/21/gove-accuses-uk-university-protests-of-antisemitism-repurposed-for-instagram-age')
+# insert_link('https://www.theguardian.com/world/2025/feb/19/british-journalist-charlotte-peet-missing-in-brazil-for-more-than-10-days')
 # time.sleep(60)
 
 connect_db()
@@ -58,12 +58,15 @@ while not is_generate_voice_error:
             # chrome_options.add_argument(f"user-agent={user_agent}")
             # chrome_options.add_argument("--remote-debugging-port=9224")
             # chrome_options.add_argument("--no-sandbox")
-
-
-            # nếu linux:
             #service = Service(ChromeDriverManager(driver_version="133.0.6943.53").install())
-            #browser = webdriver.Chrome(service=service, options=chrome_options)
-            browser = webdriver.Chrome(options=chrome_options)
+
+
+            
+            browser = webdriver.Chrome(
+                options=chrome_options,
+                # nếu linux:
+                #service=service,
+            )
             
             browser.get('https://www.theguardian.com/world')
 
@@ -260,7 +263,7 @@ while not is_generate_voice_error:
 
                     # generate voice ---------------------------------------
                     print('generate voice-----------------')
-                    is_generate_voice_success = generate_voice_kokoro(content, f"{path_folder}/content-voice.mp3")
+                    is_generate_voice_success = generate_voice_kokoro_pip(content, f"{path_folder}/content-voice.mp3")
 
                     if not is_generate_voice_success:
                         print('generate voice error ....')

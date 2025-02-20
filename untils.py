@@ -19,12 +19,19 @@ from webdriver_manager.chrome import ChromeDriverManager
 import base64
 import ffmpeg
 import numpy as np
-os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
-os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG\espeak-ng.exe"
-from Kokoro.models import build_model
-import torch
-# 3️⃣ Call generate, which returns 24khz audio and the phonemes used
-from Kokoro.kokoro import generate
+
+# # nếu sử dụng https://github.com/zboyles/Kokoro-82M.git
+# os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
+# os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG\espeak-ng.exe"
+# from Kokoro.models import build_model
+# import torch
+# # 3️⃣ Call generate, which returns 24khz audio and the phonemes used
+# from Kokoro.kokoro import generate
+
+# # nếu tải pip install kokoro
+from kokoro import KPipeline
+from moviepy import AudioFileClip, concatenate_audioclips
+import soundfile as sf
 
 def generate_content(content):
     genai.configure(api_key="AIzaSyArae1nyjhAiRedUMkrUWd7p_-BJglXBNU")
@@ -459,48 +466,72 @@ def generate_voice_google(text, out_path, url):
     except:
         return False
 
-def generate_voice_kokoro(text, out_path):
+# def generate_voice_kokoro(text, out_path):
+#     try:
+#         text_arr = split_text(text, 500)
+#         audio_paths = []
+#         for key, item in enumerate(text_arr):
+#             audio_path = f'./audio-{key}.mp3'
+#             audio_paths.append(audio_path)
+
+#             device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#             MODEL = build_model('./Kokoro/kokoro-v0_19.pth', device)
+#             VOICE_NAME = [
+#                 'af', # Default voice is a 50-50 mix of Bella & Sarah
+#                 'af_bella', 'af_sarah', 'am_adam', 'am_michael',
+#                 'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
+#                 'af_nicole', 'af_sky',
+#             ][0]
+#             VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=True).to(device)
+#             print(f'Loaded voice: {VOICE_NAME}')
+
+#             audio, out_ps = generate(MODEL, item, VOICEPACK, lang=VOICE_NAME[0])
+
+#             process = (
+#                             ffmpeg
+#                             .input('pipe:0', format='f32le', ac=1, ar='24000')  # Định dạng đầu vào
+#                             .output(audio_path, acodec='libmp3lame', audio_bitrate='192k')
+#                             .overwrite_output()
+#                             .run_async(pipe_stdin=True)
+#                         )
+
+#             # Gửi dữ liệu âm thanh vào ffmpeg
+#             process.stdin.write(audio.astype(np.float32).tobytes())
+#             process.stdin.close()
+#             process.wait()
+
+#         clips = [AudioFileClip(audio) for audio in audio_paths]
+#         final_clip = concatenate_audioclips(clips)
+#         final_clip.write_audiofile(out_path)
+#         return True
+            
+#     except NameError:
+        
+#       print('An exception occurred')
+#       print(NameError)
+#       return False
+    
+def generate_voice_kokoro_pip(text, out_path):
     try:
-        text_arr = split_text(text, 500)
+        print('generate voice')
+        pipeline = KPipeline(lang_code='a') # <= make sure lang_code matches voice
+
+        generator = pipeline(
+            text, voice='af_heart', # <= change voice here
+            speed=1, split_pattern=r'\n+'
+        )
+
         audio_paths = []
-        for key, item in enumerate(text_arr):
-            audio_path = f'./audio-{key}.mp3'
+        for i, (gs, ps, audio) in enumerate(generator):
+            audio_path = f"./audio_{i}.wav"
             audio_paths.append(audio_path)
-
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            MODEL = build_model('./Kokoro/kokoro-v0_19.pth', device)
-            VOICE_NAME = [
-                'af', # Default voice is a 50-50 mix of Bella & Sarah
-                'af_bella', 'af_sarah', 'am_adam', 'am_michael',
-                'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
-                'af_nicole', 'af_sky',
-            ][0]
-            VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=False).to(device)
-            print(f'Loaded voice: {VOICE_NAME}')
-
-            audio, out_ps = generate(MODEL, item, VOICEPACK, lang=VOICE_NAME[0])
-
-            process = (
-                            ffmpeg
-                            .input('pipe:0', format='f32le', ac=1, ar='24000')  # Định dạng đầu vào
-                            .output(audio_path, acodec='libmp3lame', audio_bitrate='192k')
-                            .overwrite_output()
-                            .run_async(pipe_stdin=True)
-                        )
-
-            # Gửi dữ liệu âm thanh vào ffmpeg
-            process.stdin.write(audio.astype(np.float32).tobytes())
-            process.stdin.close()
-            process.wait()
+            
+            sf.write(audio_path, audio, 24000)
 
         clips = [AudioFileClip(audio) for audio in audio_paths]
         final_clip = concatenate_audioclips(clips)
         final_clip.write_audiofile(out_path)
-        return True
-            
-    except NameError:
-        
-      print('An exception occurred')
-      print(NameError)
-      return False
-    
+    except:
+      print('generate voice error')
+      return False 
+

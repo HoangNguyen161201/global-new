@@ -38,10 +38,6 @@ vpsdime.com
 4 cách chạy file:
 python3 main.py
 
-5 tải kokoro-82m:
-- cd global-new
-- git clone https://github.com/zboyles/Kokoro-82M.git
-
-6 khác:
+5 khác:
 - rm -r tên_thư_mục: xóa tên thư mục
 - mv thumuc_cu thumuc_moi: đổi tên thư mục

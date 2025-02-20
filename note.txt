@@ -12,6 +12,8 @@ transformers==4.48.1
 phonemizer==3.3.0
 python-slugify==8.0.4
 pyglet==2.1.1
+soundfile==0.13.1
+kokoro==0.7.16
 
 Package                      Version
 ---------------------------- -----------
