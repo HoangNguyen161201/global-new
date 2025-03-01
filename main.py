@@ -25,10 +25,9 @@ import pyglet
 # subprocess.Popen([chrome_path, f'--user-data-dir={user_data_dir}'])
 # time.sleep(5)
 
+# delete_link('https://www.theguardian.com/uk-news/2025/feb/23/met-office-warns-of-danger-to-life-from-flooding-in-parts-of-uk')
 # print(get_all_links())
-# delete_link('https://www.theguardian.com/world/2025/feb/15/uk-based-lawyers-for-hong-kong-activist-jimmy-lai-targeted-by-chinese-state')
-# insert_link('https://www.theguardian.com/world/2025/feb/19/british-journalist-charlotte-peet-missing-in-brazil-for-more-than-10-days')
-# time.sleep(60)
+# # insert_link('https://www.theguardian.com/world/2025/feb/19/british-journalist-charlotte-peet-missing-in-brazil-for-more-than-10-days')
 
 connect_db()
 # is_generate_voice_success = generate_voice_google(
@@ -122,12 +121,14 @@ while not is_generate_voice_error:
                     meta_title = browser.find_element("xpath", '//meta[@property="og:title"]')
                     # Lấy giá trị của thuộc tính content
                     title = str(meta_title.get_attribute("content"))
+                    title_mobile = str(meta_title.get_attribute("content"))
                     print(title)
 
                     # Lấy thẻ meta có name="description"
                     meta_description = browser.find_element("xpath", '//meta[@name="description"]')
                     # Lấy giá trị của thuộc tính content
                     description = str(meta_description.get_attribute("content"))
+                    description_mobile = str(meta_description.get_attribute("content"))
                     print(description)
                    
                     # Lấy thẻ meta có name="description"
@@ -156,6 +157,7 @@ while not is_generate_voice_error:
                     article = main_body.find_element(By.TAG_NAME, 'article')
                     contents =  [element.text for element in article.find_elements(By.TAG_NAME, 'p')]
                     content = " ".join(contents)
+                    content_mobile = " ".join(contents)
                     print(content)
 
                     # images
@@ -208,12 +210,18 @@ while not is_generate_voice_error:
 
                     # generate title by ai
                     print('generate title')
-                    title = generate_content(f'hãy viết lại title bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, không được có dấu : trong title, trên 50 ký tự và dưới 100 ký tự để cho tôi đặt title cho video youtube của tôi: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    is_low_100 = False
+                    while is_low_100 is False:
+                        title = generate_content(f'hãy viết lại title bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, không được có dấu : trong title, trên 50 ký tự và dưới 100 ký tự để cho tôi đặt title cho video youtube của tôi: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                        if title.__len__() < 100:
+                            is_low_100 = True
                     print(title)
+                    time.sleep(5)
 
                     print('generate description')
                     description = generate_content(f'tôi đang có title là: {title}. tag là: {tags}. description ban đầu là: {description}. Hãy viết lại description bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, để cho tôi gắn vào phần mô tả cho video youtube của tôi: {description}, trả ra description cho tôi luôn, không cần phải ghi thêm gì hết.')
                     print(description)
+                    time.sleep(5)
 
                     if len(title) > 100:
                         title = title[:100]
@@ -222,7 +230,7 @@ while not is_generate_voice_error:
                     # generate content by ai
                     print(f'generate content {content.__len__()}')
 
-                    content = generate_content(f'hãy viết lại đoạn văn sau bằng tiếng anh và có độ dài ký tự là {content.__len__()}: {content}')
+                    content = generate_content(f'hãy viết lại content sau bằng tiếng anh sao cho hấp dẫn, và có độ dài ký tự là {content.__len__()}: {content}')
                     print(content)
                 
                     # generate tags
@@ -247,6 +255,7 @@ while not is_generate_voice_error:
                         f"{path_folder}/image-0.jpg",
                         f"{path_folder}/image-blur-0.jpg",
                         person_img_path,
+                        f"{path_folder}/draf-thumbnail.jpg",
                         f"{path_folder}/thumbnail.jpg",
                         title.replace('*', '')
                     )
@@ -290,7 +299,7 @@ while not is_generate_voice_error:
                     browser.quit()
                     
                     print('upload video to youtube')
-                    des_youtube = f"{description}\n\n(tags):\n{result}"
+                    des_youtube = f"{description}\n\n(tags):\n{result}\n\nSubscribe to Global New channel and press the bell icon to get notified when we has a new post.\nhttps://www.youtube.com/@global_new?sub_confirmation=1"
                     upload_yt(
                         "C:/Path/To/Chrome/news-us",
                         title,
@@ -300,8 +309,137 @@ while not is_generate_voice_error:
                         os.path.abspath(f"{path_folder}/thumbnail.jpg"),
                     )
                     print('upload video to youtube successfully')
+                    time.sleep(180)
+
+                    # # short -----------------------------------
+                    # #import images
+                    # print('bắt đầu tạo short')
+                    # path_videos = []
+                    # def process_image_and_video(item, key, path_folder):
+                    #     img_path = f"{path_folder}/image-{key}-mobile.jpg"
+                    #     img_blur_path = f"{path_folder}/image-blur-{key}-mobile.jpg"
+                    #     generate_image(item, img_path, img_blur_path, 1080, 1920)
+                    #     random_number = random.randint(5, 10)
+                    #     generate_video_by_image(
+                    #         1 if key % 2 == 0 else None,
+                    #         img_path,
+                    #         img_blur_path,
+                    #         f'{path_folder}/video-mobile-{key}.mp4',
+                    #         random_number,
+                    #         gif_path,
+                    #         True
+                    #     )
+                    #     return f"{path_folder}/video-mobile-{key}.mp4"
+                    # with concurrent.futures.ThreadPoolExecutor() as executor:
+                    #     futures = []
+                    #     for key, item in enumerate(images):
+                    #         futures.append(
+                    #             executor.submit(process_image_and_video, item, key, path_folder)
+                    #         )
+                        
+                    #     path_videos = [future.result() for future in concurrent.futures.as_completed(futures)]
                     
-                    time.sleep(60)
+                    # # generate title by ai
+                    # print('generate title mobile')
+                    # is_low_100 = False
+                    # while is_low_100 is False:
+                    #     try:
+                    #         title = generate_content(f'tôi đang làm youtube short, tôi có tilte là {title_mobile}, description là ${description_mobile}, tags là {tags}. hãy viết lại title có 3 hastags chính bằng tiếng anh giúp video short dễ lên xu hướng, và tổng ký tự tilte kèm hastags phải dưới 100 ký tự, phải dưới 100 ký tự nha, sao cho hay và nổi bật, chuẩn seo. trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    #         if title.__len__() <= 58:
+                    #             is_low_100 = True
+                    #     except:
+                    #       print('An exception occurred')
+                    #       time.sleep(30)
+                    # print(title)
+                    # time.sleep(5)
+
+                    # print('generate description mobile')
+                    # description = generate_content(f'tôi đang có title là: {title}. tag là: {tags}. description ban đầu là: {description_mobile}. Hãy viết lại description bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, để cho tôi gắn vào phần mô tả cho video youtube của tôi: {description_mobile}, trả ra description cho tôi luôn, không cần phải ghi thêm gì hết.')
+                    # print(description)
+
+                    # if len(title) > 100:
+                    #     title = title[:100]
+                    # title_slug = slugify(str(title))
+
+                    # time.sleep(5) 
+
+                    # # generate content by ai
+                    # print(f'generate content mobile')
+                    # is_low_600 = False
+                    # while is_low_600 is False:
+                    #     try:
+                    #         content = generate_content(f'hãy viết lại content sau bằng tiếng anh sao cho hấp dẫn và có độ dài ký tự dưới 600 ký tự, trả ra content cho tôi luôn, không cần phải ghi thêm gì hết: {content_mobile}')
+                    #         if content.__len__() < 600:
+                    #             is_low_600 = True
+                    #     except:
+                    #       print('An exception occurred')
+                    #       time.sleep(30)
+                    # print(content.__len__())
+                    # print(content)
+
+                    # # generate voice ---------------------------------------
+                    # print('generate voice-----------------')
+                    # is_generate_voice_success = generate_voice_kokoro_pip(content, f"{path_folder}/content-voice-mobile.mp3")
+
+                    # if not is_generate_voice_success:
+                    #     print('generate voice error ....')
+                    #     music = pyglet.resource.media('public/reng.weba', streaming=False)
+                    #     player = pyglet.media.Player()
+                    #     player.queue(music)
+                    #     player.loop = True
+                    #     player.play()
+                    #     pyglet.app.run()
+
+
+                    #     is_generate_voice_error = True
+                    #     browser.quit()
+                    #     subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
+                    #     print('time hien tai')
+                    #     print(datetime.now())
+                    #     break
+
+                    # # generate voice ---------------------------------------
+                    # print('generate voice title-----------------')
+                    # is_generate_voice_success = generate_voice_kokoro_pip(title.split('#')[0], f"{path_folder}/content-title-mobile.mp3")
+
+                    # if not is_generate_voice_success:
+                    #     print('generate voice error ....')
+                    #     music = pyglet.resource.media('public/reng.weba', streaming=False)
+                    #     player = pyglet.media.Player()
+                    #     player.queue(music)
+                    #     player.loop = True
+                    #     player.play()
+                    #     pyglet.app.run()
+
+
+                    #     is_generate_voice_error = True
+                    #     browser.quit()
+                    #     subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
+                    #     print('time hien tai')
+                    #     print(datetime.now())
+                    #     break
+                        
+                
+                    # # concact content video ---------------------------------------
+                    # concact_content_videos(f"{path_folder}/content-voice-mobile.mp3",path_videos, f'{path_folder}/{title_slug}.mp4', True, {
+                    #     "title_audio": f"{path_folder}/content-title-mobile.mp3",
+                    #     "title": title.split('#')[0],
+                    # })
+                    # print('upload video to youtube')
+                    # des_youtube = f"{description}"
+                    # upload_yt(
+                    #     "C:/Path/To/Chrome/news-us",
+                    #     title,
+                    #     des_youtube,
+                    #     f'news, {result}, breaking news, current events,',
+                    #     os.path.abspath(f'{path_folder}/{title_slug}.mp4'),
+                    #     None, True
+
+                    # )
+                    # print('upload short to youtube successfully')
+                    # time.sleep(240)
+
+
                 else:
                     insert_link(current_link)
                     browser.quit()

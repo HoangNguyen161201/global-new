@@ -1,7 +1,7 @@
 import sqlite3
 
-def connect_db():
-    conn = sqlite3.connect('mydatabase.db')
+def connect_db(name = 'mydatabase.db'):
+    conn = sqlite3.connect(name)
     cursor = conn.cursor()
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS links 
@@ -10,8 +10,8 @@ def connect_db():
     conn.commit()
     conn.close()
 
-def get_all_links():
-    conn = sqlite3.connect('mydatabase.db')
+def get_all_links(name = 'mydatabase.db'):
+    conn = sqlite3.connect(name)
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM links")
@@ -22,8 +22,8 @@ def get_all_links():
 
     return result
 
-def check_link_exists(url):
-    conn = sqlite3.connect('mydatabase.db')
+def check_link_exists(url, name = 'mydatabase.db'):
+    conn = sqlite3.connect(name)
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM links WHERE url=?", (url,))
@@ -38,16 +38,16 @@ def check_link_exists(url):
         return False
     
 
-def insert_link(url):
-    conn = sqlite3.connect('mydatabase.db')
+def insert_link(url, name = 'mydatabase.db'):
+    conn = sqlite3.connect(name)
     cursor = conn.cursor()
 
     cursor.execute("INSERT INTO links (url) VALUES (?)", (url,))
     conn.commit()
     conn.close()
 
-def delete_link(url):
-    conn = sqlite3.connect('mydatabase.db')
+def delete_link(url, name = 'mydatabase.db'):
+    conn = sqlite3.connect(name)
     cursor = conn.cursor()
 
     cursor.execute("DELETE FROM links WHERE url=?", (url,))

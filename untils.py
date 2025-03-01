@@ -3,12 +3,13 @@ import asyncio
 import edge_tts
 import cv2
 import requests
-from moviepy import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips, concatenate_audioclips
+from moviepy import TextClip, VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips, concatenate_audioclips
 import os
 from PIL import Image, ImageDraw, ImageFont
 from data import edge_voice_data
 import subprocess
 import time
+from selenium.webdriver.common.keys import Keys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -19,6 +20,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 import base64
 import ffmpeg
 import numpy as np
+from datetime import datetime, timedelta
+import random
+import textwrap
 
 # # nếu sử dụng https://github.com/zboyles/Kokoro-82M.git
 # os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
@@ -45,7 +49,39 @@ def generate_to_voice(content, path):
         await c.save(path)
     asyncio.run(main())
 
-def generate_image(link, out_path, out_blur_path):
+def resize_to_cover(image, target_width, target_height):
+    # Get the original dimensions
+    original_height, original_width = image.shape[:2]
+    
+    # Calculate the aspect ratios
+    target_aspect = target_width / target_height
+    original_aspect = original_width / original_height
+    
+    # Determine the scaling factor and dimensions to cover the target area
+    if original_aspect > target_aspect:
+        # Image is wider than target, scale by height
+        scale = target_height / original_height
+    else:
+        # Image is taller than target, scale by width
+        scale = target_width / original_width
+    
+    # Resize the image
+    new_width = int(original_width * scale)
+    new_height = int(original_height * scale)
+    resized_image = cv2.resize(image, (new_width, new_height))
+    
+    # Calculate the cropping coordinates
+    x_center = new_width // 2
+    y_center = new_height // 2
+    x_crop = target_width // 2
+    y_crop = target_height // 2
+    
+    # Crop the image to the target dimensions
+    cropped_image = resized_image[y_center - y_crop:y_center + y_crop, x_center - x_crop:x_center + x_crop]
+    
+    return cropped_image
+
+def generate_image(link, out_path, out_blur_path, width = None, height = None):
     response = requests.get(link)
     if response.status_code == 200:
         with open(out_path, "wb") as f:
@@ -54,38 +90,47 @@ def generate_image(link, out_path, out_blur_path):
         print("Yêu cầu không thành công. Mã trạng thái:", response.status_code)
 
     image = cv2.imread(out_path)
-    image = cv2.flip(image, 1)
     image = image[150:-150, 150:-150]
-
+    blurred_image_edit = None
+    if width is not None and height is not None:
+        blurred_image_edit  = resize_to_cover(image, width, height)
+    else:
+        image = cv2.flip(image, 1)
     border_thickness = 25
     border_color = (255, 255, 255)
+    blurred_image_edit_2 = cv2.copyMakeBorder(blurred_image_edit if blurred_image_edit is not None else image, border_thickness, border_thickness, border_thickness, border_thickness, cv2.BORDER_CONSTANT, value=border_color)
     image = cv2.copyMakeBorder(image, border_thickness, border_thickness, border_thickness, border_thickness, cv2.BORDER_CONSTANT, value=border_color)
 
     # Làm mờ hình ảnh bằng Blur
-    blurred_image = cv2.GaussianBlur(image, (0, 0), 15)
+    blurred_image = cv2.GaussianBlur(blurred_image_edit_2, (0, 0), 15)
 
     cv2.imwrite(out_path, image)
     cv2.imwrite(out_blur_path, blurred_image)
 
-def generate_video_by_image(zoom_in, in_path, blur_in_path, out_path, second, gif_path, is_short = None):
+def generate_video_by_image(zoom_in, in_path, blur_in_path, out_path, second, gif_path, is_short = False):
     clip_image = ImageClip(in_path).with_duration(second)
-    clip_blurred_image = ImageClip(blur_in_path, duration= second).resized((1920, 1080))
+    clip_blurred_image = ImageClip(blur_in_path, duration= second).resized((1080, 1920) if is_short else (1920, 1080))
     clip_blurred_image = clip_blurred_image.resized(lambda t: 1 + 0.3 * t/second)
 
     if not zoom_in:
         w_clip_image, h_clip_image = clip_image.size
         percent = (960 / w_clip_image) if (960 / w_clip_image) * h_clip_image < 720 else (720 / h_clip_image)
+        if is_short:
+            percent = (720 / w_clip_image) if (720 / w_clip_image) * h_clip_image < 960 else (960 / h_clip_image)
         clip_image = clip_image.resized((percent * w_clip_image, percent * h_clip_image))
         clip_image = clip_image.resized(lambda t: 1 + 0.4 * t/second)
     else:
         w_clip_image, h_clip_image = clip_image.size
         percent = ((1920 - 60) / w_clip_image) if ((1920 - 60) / w_clip_image) * h_clip_image < 1020 else (1020 / h_clip_image)
+        if is_short:
+            percent = (1020 / w_clip_image) if (1020 / w_clip_image) * h_clip_image < (1920 - 60) else ((1920 - 60) / h_clip_image)
         clip_image = clip_image.resized((percent * w_clip_image, percent * h_clip_image))
         clip_image = clip_image.resized(lambda t: 1 - 0.3 * t/second)
     
     # add gif
     gif = VideoFileClip(gif_path, has_mask= True)
-    gif = gif.resized((int(1920 * 0.8), int(1080 * 0.8)))
+    percent_gif = 0.8 
+    gif = gif.resized((int(1920 * percent_gif), int(1080 * percent_gif)))
     while gif.duration < second:
         gif = concatenate_videoclips([gif, gif])
     gif = gif.subclipped(0, second)
@@ -94,27 +139,41 @@ def generate_video_by_image(zoom_in, in_path, blur_in_path, out_path, second, gi
     # Tạo avatar clip
     avatar_clip = ImageClip('./public/avatar.png').resized((200, 200))
     avatar_clip = avatar_clip.with_opacity(0.7)
-    avatar_clip = avatar_clip.with_position((1650,  50))
+    avatar_clip = avatar_clip.with_position((830 if is_short else 1650,  50))
 
-    final_clip = CompositeVideoClip([clip_blurred_image.with_position('center'), clip_image.with_position('center'), gif.with_position((0, 250)),  avatar_clip.with_duration(second)])
+    final_clip = CompositeVideoClip([
+        clip_blurred_image.with_position('center'),
+        clip_image.with_position('center'),
+        gif.with_position((0, 1080 if is_short else 250)),
+        avatar_clip.with_duration(second)
+        ])
 
     final_clip.write_videofile(out_path, fps=24)
 
-def concact_content_videos(audio_path, video_path_list, out_path):
+def wrap_text(text, width=50):
+    return "\n".join(textwrap.wrap(text, width=width))
+def concact_content_videos(audio_path, video_path_list, out_path, is_short = False, title_mobile_options = None):
     # Load âm thanh
     audio = AudioFileClip(audio_path)
     audio_duration = audio.duration
 
     # intro video
     intro = VideoFileClip('./public/intro.mp4')
-    intro_audio = AudioFileClip('./public/intro.mp4')
-    intro = intro.resized((1920, 1080))
-    intro_duration = intro.duration
+    intro_audio = AudioFileClip(title_mobile_options['title_audio'] if is_short else './public/intro.mp4')
+    intro = intro.resized((1080, 1920) if is_short else (1920, 1080))
+    intro_duration =  intro.duration
     final_duration = audio_duration + intro_duration
 
     duration_video = 0
     index = 0
-    videos = [intro] 
+    videos = [] if is_short else [intro]
+
+    bg_mobile_img = Image.open('./public/bg/bg-mobile-1.png').convert("RGBA")
+    bg_mobile_array = np.array(bg_mobile_img)
+    bg_mobile = ImageClip(bg_mobile_array, duration= 5, is_mask = False, transparent = True)  # Không cố định thời gian ở đây
+    bg_mobile = bg_mobile.with_position((0, -700))
+ 
+    bg_mobile = bg_mobile.with_duration(intro.duration)
 
     while duration_video < final_duration:
         video = VideoFileClip(video_path_list[index])
@@ -130,17 +189,22 @@ def concact_content_videos(audio_path, video_path_list, out_path):
         else:
             index += 1
 
-    
-
     # Nối video lại với nhau
-    final_video = concatenate_videoclips(videos).subclipped(0,audio_duration + intro_duration)
+    final_video = concatenate_videoclips(videos).subclipped(0, final_duration)
     # Ghép video và âm thanh lại với nhau
     final_video = final_video.with_audio(concatenate_audioclips([intro_audio, audio]))
-
-    final_video.write_videofile(out_path)
-
+    final_video.write_videofile('./mobile.mp4' if is_short else out_path)
     final_video.close()
-  
+
+    if(is_short):
+        name_clip = TextClip(text = wrap_text(title_mobile_options['title'], 20), interline = 10, font_size=70, font="./fonts/arial/arial.ttf",  size=(2000, None), text_align="center").with_position(("center", 330)).with_duration(intro_duration).with_start(0)
+        # pronunciation_clip = TextClip(text = wrap_text(animal_options['pronunciation'].upper(), 100), interline = 10, font_size=50, font="C:/Windows/Fonts/Arial.ttf", color='white',  size=(2000, None), text_align="center", stroke_color="black", stroke_width=3).with_position(("center", 730)).with_duration(duration).with_start(0)
+
+        video = VideoFileClip('./mobile.mp4')
+        final_video = CompositeVideoClip([video, bg_mobile, name_clip])
+        final_video.write_videofile(out_path)
+        final_video.close()
+
 
 def count_folders(path):
     # Kiểm tra xem đường dẫn tồn tại không
@@ -152,7 +216,7 @@ def count_folders(path):
     folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
     return len(folders)
 
-def generate_thumbnail(img_path, img_blur_path, img_person_path, out_path, text):
+def generate_thumbnail(img_path, img_blur_path, img_person_path, draf_path, out_path, text):
     text = text.upper()
     # Mở ảnh thứ nhất (ảnh nền chính)
     background = Image.open(img_path)
@@ -230,11 +294,35 @@ def generate_thumbnail(img_path, img_blur_path, img_person_path, out_path, text)
             draw.text((x_text + offset[0], y_text + offset[1]), line, font=font, fill="white")
         y_text += int(line_height * 1.8)
 
-    # Lưu ảnh kết quả
-    background_2.save(out_path)
+    # Lưu ảnh draf 
+    background_2.save(draf_path)
+
+    # lưu ảnh với bg 
+    jpg_image = Image.open(draf_path)  
+    png_image = Image.open('./public/bg/bg-1.png')
+    png_image = png_image.convert("RGBA")
+    jpg_image.paste(png_image, (0, 0), png_image)
+    jpg_image.save(out_path)
+
+from datetime import datetime, timedelta
+
+class TimeManager:
+    current_time = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(hours=20)
+
+    @staticmethod
+    def reset_to_current_time():
+        TimeManager.current_time = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(hours=16)
+        print(f"Thời gian đã được reset: {TimeManager.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    @staticmethod
+    def add_30_minutes():
+        new_time = TimeManager.current_time + timedelta(minutes=30)
+        TimeManager.current_time = new_time
+        print(f"Thời gian sau khi cộng 30 phút: {TimeManager.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbnail):
+
+def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbnail, is_short = False):
     ### dùng để tạo ra 1 user
     # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
     # user_data_dir = "C:/Path/To/Chrome/news-us"
@@ -249,8 +337,8 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
     chrome_options.add_argument(f"user-data-dir={user_data_dir}")
     chrome_options.add_argument("profile-directory=Default")  # Nếu bạn muốn sử dụng profile mặc định
-    chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
-    chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
+    # chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
+    # chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
 
     # Sử dụng Service để chỉ định ChromeDriver
     service = Service(ChromeDriverManager().install())
@@ -260,7 +348,6 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     browser = webdriver.Chrome(service=service, options=chrome_options)
 
     browser.get("https://studio.youtube.com/")
-
     # await browser load end
     WebDriverWait(browser, 100).until(
         EC.presence_of_all_elements_located((By.ID, 'create-icon'))
@@ -273,22 +360,22 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     browser.find_element(By.ID, 'text-item-0').click()
     time.sleep(3)
 
-    print('fgfg fg fg')
-
     # upload video
     print('upload video in youtube')
     file_input = browser.find_elements(By.TAG_NAME, 'input')[1]
     file_input.send_keys(video_path)
     time.sleep(3)
 
-    # upload thumbnail
-    print('upload thumbnail in youtube')
-    WebDriverWait(browser, 10).until(
-        EC.presence_of_all_elements_located((By.ID, 'file-loader'))
-    )
-    thumbnail_input = browser.find_element(By.ID, 'file-loader')
-    thumbnail_input.send_keys(video_thumbnail)
-    time.sleep(3)
+    if is_short is False:
+        # upload thumbnail
+        print('upload thumbnail in youtube')
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_all_elements_located((By.ID, 'file-loader'))
+        )
+        thumbnail_input = browser.find_element(By.ID, 'file-loader')
+        thumbnail_input.send_keys(video_thumbnail)
+        time.sleep(3)
+
 
     # enter title
     print('nhập title in youtube')
@@ -345,9 +432,7 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     # canvas_element = WebDriverWait(browser, 10).until(
     #     EC.element_to_be_clickable((By.TAG_NAME, "canvas"))
     # )
-    # print('nguyen quang hoang')
     # browser.execute_script("arguments[0].click();", canvas_element)
-    # print('nguyen quang hhuy')
     # time.sleep(2)
     # browser.find_element(By.ID, 'save-button').click()
     # time.sleep(4)
@@ -369,7 +454,52 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
         time.sleep(2)  # Đợi 2 giây trước khi kiểm tra lại
 
     browser.find_element(By.ID, 'next-button').click()
-    time.sleep(3)
+    time.sleep(2)
+
+    # chọn upload trực tiếp hay lên lịch
+    current_time = datetime.now()
+    current_hour = current_time.hour
+
+    # # Đặt khoảng thời gian từ 17:00 đến 08:00
+    # if (current_hour >= 16 or current_hour < 6) or is_short:
+    #     if is_short is False:
+    #         TimeManager.reset_to_current_time()
+    #     print('Upload trực tiếp')
+    # else:
+    #     print('lên lịch upload')
+    #     schedule_datetime = TimeManager.current_time
+    #     formatted_date = schedule_datetime.strftime("%b %d, %Y")  # Thí dụ: "Feb 23, 2025"
+    #     formatted_time = schedule_datetime.strftime("%I:%M %p")   # Thí dụ: "01:00 AM"
+    #     print(f'lên lịch upload {formatted_date} {formatted_time}')
+    #     WebDriverWait(browser, 10).until(
+    #         EC.presence_of_all_elements_located((By.ID, 'second-container-expand-button'))
+    #     )
+    #     browser.find_element(By.ID, 'second-container-expand-button').click()
+    #     time.sleep(2)
+    #     WebDriverWait(browser, 10).until(
+    #         EC.presence_of_all_elements_located((By.XPATH, "//tp-yt-paper-input[@id='textbox']//input[@class='style-scope tp-yt-paper-input']"))
+    #     )
+    #     time_input = browser.find_element(By.XPATH, "//tp-yt-paper-input[@id='textbox']//input[@class='style-scope tp-yt-paper-input']")
+    #     time_input.clear()
+    #     time_input.send_keys(formatted_time)
+    #     time.sleep(2)
+    #     WebDriverWait(browser, 10).until(
+    #         EC.presence_of_all_elements_located((By.ID, 'right-icon'))
+    #     )
+    #     browser.find_element(By.ID, 'right-icon').click()
+    #     time.sleep(1)
+    #     WebDriverWait(browser, 10).until(
+    #         EC.presence_of_all_elements_located((By.XPATH, "//tp-yt-paper-input[@aria-label='Enter date']//input[@class='style-scope tp-yt-paper-input']"))
+    #     )
+    #     date_input = browser.find_element(By.XPATH, "//tp-yt-paper-input[@aria-label='Enter date']//input[@class='style-scope tp-yt-paper-input']")
+    #     date_input.clear()
+    #     date_input.send_keys(formatted_date)
+    #     time.sleep(1)
+    #     date_input.send_keys(Keys.RETURN)
+    #     time.sleep(2)
+    #     TimeManager.add_30_minutes()
+        
+        
 
     # done
     print('upload video in youtube thành công')
