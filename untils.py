@@ -358,7 +358,7 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     time.sleep(1)
 
     browser.find_element(By.ID, 'text-item-0').click()
-    time.sleep(3)
+    time.sleep(10)
 
     # upload video
     print('upload video in youtube')
@@ -384,6 +384,7 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     )
     title_input = browser.find_element(By.ID, 'textbox')
     title_input.clear()
+    time.sleep(1)
     title_input.send_keys(title)
     time.sleep(1)
 
@@ -391,6 +392,7 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     print('nhập description in youtube')
     des_input = browser.find_elements(By.ID, 'textbox')[1]
     des_input.clear()
+    time.sleep(1)
     des_input.send_keys(description)
     time.sleep(1)
 
