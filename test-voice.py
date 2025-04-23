@@ -1,3 +1,20 @@
-from untils import generate_voice_kokoro_pip
+from untils import create_video_support
+import random
+from data import data_support
+import os
 
-generate_voice_kokoro_pip("Glencore's Potential Departure from London Stock Exchange: A Significant Blow to UK Markets Glencore, the Swiss-based commodities giant, is contemplating a relocation of its primary share listing from the London Stock Exchange (LSE), a move that would deliver a substantial blow to the UK's already struggling blue-chip market. This consideration comes amidst a series of high-profile departures, prompting concerns about London's competitiveness as a leading global exchange. The company's statement acknowledges", './t.mp3')
+support_randoom = random.sample(data_support, 3)
+link_support_images = [item['link_img'] for item in support_randoom]
+list_discount = [item['discount'] for item in support_randoom]
+content_supports = "\n".join([item['content'] for item in support_randoom])
+
+# tạo video kêu gọi kiếm tiền
+create_video_support(
+    './public/support.mp3',
+    './public/bg/support.png',
+    './public/gifs/gif_1.gif',
+    './public/support.mp4',
+    link_support_images,
+    ['./public/support_1.png', './public/support_2.png', './public/support_3.png'],
+    list_discount
+)

@@ -23,6 +23,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import random
 import textwrap
+import pillow_avif
+from io import BytesIO
 
 # # nếu sử dụng https://github.com/zboyles/Kokoro-82M.git
 # os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
@@ -162,11 +164,18 @@ def concact_content_videos(audio_path, video_path_list, out_path, is_short = Fal
     intro_audio = AudioFileClip(title_mobile_options['title_audio'] if is_short else './public/intro.mp4')
     intro = intro.resized((1080, 1920) if is_short else (1920, 1080))
     intro_duration =  intro.duration
-    final_duration = audio_duration + intro_duration
+
+    # video suport chưa sửa cho short, chỉ cho long
+    support = VideoFileClip('./public/support.mp4')
+    support_audio = AudioFileClip('./public/support.mp4')
+    support = support.resized((1080, 1920) if is_short else (1920, 1080))
+    support_duration =  support.duration
+    final_duration = audio_duration + intro_duration + support_duration
+
 
     duration_video = 0
     index = 0
-    videos = [] if is_short else [intro]
+    videos = [] if is_short else [intro, support]
 
     bg_mobile_img = Image.open('./public/bg/bg-mobile-1.png').convert("RGBA")
     bg_mobile_array = np.array(bg_mobile_img)
@@ -192,7 +201,7 @@ def concact_content_videos(audio_path, video_path_list, out_path, is_short = Fal
     # Nối video lại với nhau
     final_video = concatenate_videoclips(videos).subclipped(0, final_duration)
     # Ghép video và âm thanh lại với nhau
-    final_video = final_video.with_audio(concatenate_audioclips([intro_audio, audio]))
+    final_video = final_video.with_audio(concatenate_audioclips([intro_audio, support_audio, audio]))
     final_video.write_videofile('./mobile.mp4' if is_short else out_path)
     final_video.close()
 
@@ -643,14 +652,14 @@ def generate_voice_google(text, out_path, url):
 #       print(NameError)
 #       return False
     
-def generate_voice_kokoro_pip(text, out_path):
+def generate_voice_kokoro_pip(text, out_path, speed= 1):
     try:
         print('generate voice')
         pipeline = KPipeline(lang_code='a') # <= make sure lang_code matches voice
 
         generator = pipeline(
             text, voice='af_heart', # <= change voice here
-            speed=1, split_pattern=r'\n+'
+            speed=speed, split_pattern=r'\n+'
         )
 
         audio_paths = []
@@ -667,4 +676,123 @@ def generate_voice_kokoro_pip(text, out_path):
     except:
       print('generate voice error')
       return False 
+
+def process_image_support(
+    input_url,
+    output_path,
+    discount=0,
+    fixed_width=410,
+    max_height=650,
+    border_width=10,
+    border_color='#CDCDCD',
+    corner_radius=20,
+):
+    # Tải ảnh
+    response = requests.get(input_url)
+    img = Image.open(BytesIO(response.content)).convert("RGBA")
+
+    # Tính lại size để KHÔNG CROP và KHÔNG MÉO
+    original_width, original_height = img.size
+    scale_w = fixed_width / original_width
+    scale_h = max_height / original_height
+    scale = min(scale_w, scale_h)
+
+    new_width = int(original_width * scale)
+    new_height = int(original_height * scale)
+
+    img = img.resize((new_width, new_height), Image.LANCZOS)
+
+    # Bo góc
+    mask = Image.new('L', (new_width, new_height), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle([0, 0, new_width, new_height], radius=corner_radius, fill=255)
+    rounded_img = Image.new("RGBA", (new_width, new_height))
+    rounded_img = Image.composite(img, rounded_img, mask)
+
+    # Thêm viền ngoài
+    bordered_width = new_width + 2 * border_width
+    bordered_height = new_height + 2 * border_width
+    bordered_img = Image.new("RGBA", (bordered_width, bordered_height), (0, 0, 0, 0))
+
+    draw = ImageDraw.Draw(bordered_img)
+    draw.rounded_rectangle(
+        [0, 0, bordered_width, bordered_height],
+        radius=corner_radius + border_width,
+        fill=border_color
+    )
+    bordered_img.paste(rounded_img, (border_width, border_width), mask=mask)
+
+    # Nếu có discount
+   
+    badge_radius = 48
+    badge_diameter = badge_radius * 2
+    badge_position = (bordered_width - badge_diameter - 10, 10)
+
+    # Vẽ hình tròn trắng
+    draw.ellipse(
+        [badge_position[0], badge_position[1], badge_position[0] + badge_diameter, badge_position[1] + badge_diameter],
+        fill="white"
+    )
+
+    # Vẽ text
+    try:
+        font = ImageFont.truetype("arial.ttf", 40)
+    except:
+        font = ImageFont.load_default()
+
+    text = f"-{discount}%" if discount > 0 else 'Hot'
+    bbox = font.getbbox(text)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_x = badge_position[0] + (badge_diameter - text_width) // 2
+    text_y = badge_position[1] + (badge_diameter - text_height) // 2 - 1
+
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            draw.text((text_x + dx, text_y + dy), text, font=font, fill="red")
+
+    bordered_img.save(output_path)
+
+def create_video_support(audio_path, bg_path, gif_path, out_path, list_image_path= [], list_image_out_paths= [], list_discount= [] ):
+    generate_voice_kokoro_pip("if you want awesome products at great prices? Check out the in the description!", audio_path ,1.3)
+    
+    # Lấy thời lượng âm thanh
+    audio = AudioFileClip(audio_path)
+    duration = audio.duration
+
+    # Resize hình nền về 1920x1080
+    background = ImageClip(bg_path).resized((1920, 1080)).with_duration(duration)
+
+
+    for index, item in enumerate(list_image_path):
+        process_image_support(item, list_image_out_paths[index], list_discount[index])
+
+    # Tạo danh sách các ImageClip với vị trí tương ứng
+    coordinates = [(200, 245), (715, 245), (1230, 245)]
+    pictures = [
+        ImageClip(image).with_position(coord).with_duration(duration)
+        for image, coord in zip(list_image_out_paths, coordinates)
+    ]
+
+    # add gif
+    gif = VideoFileClip(gif_path, has_mask= True)
+    percent_gif = 0.8 
+    gif = gif.resized((int(1920 * percent_gif), int(1080 * percent_gif)))
+    while gif.duration < duration:
+        gif = concatenate_videoclips([gif, gif])
+    gif = gif.subclipped(0, duration)
+
+
+    # Ghép hình nền và avatar
+    video = CompositeVideoClip([background] + pictures + [gif.with_position((0, 250))], size=(1920, 1080))
+
+
+    
+
+
+    # Gắn âm thanh vào video
+    final = video.with_audio(audio)
+
+    # Xuất video
+    final.write_videofile(out_path, fps=24)
 
