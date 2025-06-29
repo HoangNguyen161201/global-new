@@ -1,7 +1,0 @@
-**/videos/
-videos/
-**/.venv/
-.venv/
-./public/kokoro.mp4
-**/__pycache__/
-__pycache__/

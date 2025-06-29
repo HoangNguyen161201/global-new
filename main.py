@@ -1,35 +1,40 @@
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
-import time
+from untils import get_all_link_in_theguardian_new
+from untils import get_info_new, generate_image_and_video_aff_and_get_three_item
+from untils import upload_rumble, import_audio_to_video, upload_yt
+from untils import get_img_gif_person, concat_content_videos
+from untils import generate_image, generate_to_voice_edge
+from untils import generate_video_by_image, generate_thumbnail, create_shortened_link
+from untils import generate_title_description_improved, generate_content_improved
+from db import check_link_exists, connect_db, insert_link, get_all_links, delete_link
+from concurrent.futures import ProcessPoolExecutor, wait
 import random
-import os
-from untils import create_video_support, generate_content, generate_voice_kokoro_pip, generate_image, generate_video_by_image, concact_content_videos, count_folders, generate_thumbnail, upload_yt
-import concurrent.futures
-from data import gif_paths, person_img_paths, data_support
 from slugify import slugify
-from db import connect_db, check_link_exists, insert_link,delete_link, get_all_links
-from pathlib import Path
+import os
+import time
+import shutil
+from moviepy import AudioFileClip
 import subprocess
-from datetime import datetime
-import pyglet
 
+# print(get_all_links())
+# delete_link('https://www.theguardian.com//politics/2025/jun/25/class-age-education-dividing-lines-uk-politics-electoral-reform')
+# delete_link('https://www.theguardian.com//us-news/2025/jun/24/new-york-mayoral-primary-results')
 # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
-# user_data_dir = r"C:/Path/To/Chrome/news-us"
+# user_data_dir = r"C:/Path/To/Chrome/news-us-news"
 # subprocess.Popen([chrome_path, f'--user-data-dir={user_data_dir}'])
 # time.sleep(510000)
 
-# delete_link('https://www.theguardian.com/uk-news/2025/feb/23/met-office-warns-of-danger-to-life-from-flooding-in-parts-of-uk')
+# delete_link('https://www.theguardian.com//politics/2025/jun/25/keir-starmer-dismisses-labour-welfare-cuts-rebellion-as-noises-off')
+# connect_db()
+# delete_link('https://www.theguardian.com//business/2025/jun/25/asda-owner-near-600m-loss-as-sales-fall')
+# delete_link('https://www.theguardian.com//australia-news/2025/jun/26/nsw-coalition-proposes-cuts-to-crippling-fees-on-housing-construction-in-budget-reply')
+# delete_link('https://www.theguardian.com//tv-and-radio/2025/jun/26/everyone-was-completely-caught-off-guard-fbi-radios-future-unclear-as-station-launches-emergency-fundraising-campaign')
 # print(get_all_links())
+# time.sleep(510000)
 # # insert_link('https://www.theguardian.com/world/2025/feb/19/british-journalist-charlotte-peet-missing-in-brazil-for-more-than-10-days')
 
-connect_db()
+
+# insert_link('https://www.theguardian.com//environment/2025/jun/20/nigerian-communities-shell-high-court-oil-pollution')
+# print('gg')
 # is_generate_voice_success = generate_voice_google(
 #     'right right right right right right right right right',
 #     f"./content-voice.mp3",
@@ -38,335 +43,166 @@ connect_db()
 # time.sleep(10000)
 
 
-is_generate_voice_error = False 
-while not is_generate_voice_error:
-    count_folder = count_folders('./videos')
-    path_folder = f'./videos/video-{count_folder}'
-    current_link = None
-
-    try:
-        while not is_generate_voice_error:
-            # Tạo đối tượng ChromeOptions
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
-            chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
-
-            ## nếu là linux thì thêm
-            # chrome_options.binary_location = "/usr/bin/chromium-browser"
-            # user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
-            # chrome_options.add_argument(f"user-agent={user_agent}")
-            # chrome_options.add_argument("--remote-debugging-port=9224")
-            # chrome_options.add_argument("--no-sandbox")
-            #service = Service(ChromeDriverManager(driver_version="133.0.6943.53").install())
-
-
+def main():
+    while True:
+        current_link = None
+        try:
+            # tạo folder để chứa video
+            path_folder = f'./videos'
+            try:
+                shutil.rmtree(path_folder)
+            except:
+                print('next')
             
-            browser = webdriver.Chrome(
-                options=chrome_options,
-                # nếu linux:
-                #service=service,
-            )
-            
-            browser.get('https://www.theguardian.com/world')
+            os.makedirs(path_folder)
 
-            # await browser load end dcr-ezvrjj
-            WebDriverWait(browser, 10).until(
-                EC.presence_of_all_elements_located((By.CLASS_NAME, 'dcr-2yd10d'))
-            )
+            # lấy tất cả link tin tức
+            link_news = get_all_link_in_theguardian_new()
 
-            # get link to redirect to new
-            links_elements = browser.find_elements(By.CLASS_NAME, 'dcr-2yd10d')
-            links = []
-            for element in links_elements:
-                if element.get_attribute('data-link-name') == 'news | group-0 | card-@1':
-                    links.append(element.get_attribute('href'))
-            links.reverse()
-
-            print(links)
-            print(links.__len__())
-
-
-            current_link = None
-            for element in links:
-                if not check_link_exists(element):
-                    current_link = element
+            # kết nối db và kiểm tra có link tồn tại chưa, chưa thì lấy và làm video
+            connect_db()
+            for link in link_news:
+                if not check_link_exists(f'https://www.theguardian.com/{link}'):
+                    current_link = link
                     break
-
-            # khi có curent link -----------------------------------
-            if(current_link):
-                browser.get(current_link)
                 
-                # await browser load end
-                WebDriverWait(browser, 10).until(
-                    EC.presence_of_all_elements_located((By.TAG_NAME, 'h1'))
+            # nếu không có link thì bắn lỗi
+            if (current_link is None):
+                raise Exception("Lỗi xảy ra, không tồn tại link hoặc đã hết tin tức")
+
+            current_link = f'https://www.theguardian.com/{current_link}'
+
+            # lấy thông tin của video
+            new_info = get_info_new(current_link)
+
+            # nếu không có thông tin tin tức thì bắn lỗi
+            if (current_link is None):
+                raise Exception("Lỗi xảy ra, không có link")
+
+            # lấy ngẫu nhiên đường dẫn hình ảnh và hình động người thuyết trình
+            person_info = get_img_gif_person()
+
+            # tạo ra image gốc và image mờ, sau đó tạo ra video từng phần
+            path_videos = []
+            print(current_link)
+            if(new_info is None):
+                raise Exception("Lỗi xảy ra, không có thông tin của content")
+            for key, item in enumerate(new_info['picture_links']):
+                img_path = f"{path_folder}/image-{key}.jpg"
+                img_blur_path = f"{path_folder}/image-blur-{key}.jpg"
+                generate_image(item, img_path, img_blur_path)
+                random_number = random.randint(5, 10)
+                generate_video_by_image(
+                    1 if key % 2 == 0 else None,
+                    img_path,
+                    img_blur_path,
+                    f'{path_folder}/video-{key}.mp4',
+                    random_number,
+                    person_info['person_gif_path']
                 )
+                path_videos.append(f"{path_folder}/video-{key}.mp4")
 
+            # # tạo video kêu gọi người dùng nhấn vào link short kiếm tiền
+            # generate_video_by_image(None,
+            #                         './public/bg/short-link.png',
+            #                         './public/bg/short-link.png',
+            #                         f'{path_folder}/short-link.mp4',
+            #                         AudioFileClip('./public/short-link.aac').duration + 1,
+            #                         person_info['person_gif_path']
+            #                     )
+            # import_audio_to_video(f'{path_folder}/short-link.mp4',
+            #                     f'{path_folder}/short-link-2.mp4',
+            #                     AudioFileClip('./public/short-link.aac').duration + 1,
+            #                     './public/short-link.aac'
+            #                     )
+            products = generate_image_and_video_aff_and_get_three_item(person_info['person_gif_path'])
 
+            if(products is None):
+                raise Exception("Lỗi xảy ra, không thể tạo và lấy ra 3 product ngẫu nhiên")
 
-                try:
-                    time.sleep(5)
-                    browser.execute_script("arguments[0].remove()", browser.find_element(By.CLASS_NAME, 'dcr-pvn4wq'))
-                except:
-                    print('khong the xoa dang nhap hoac khong co')
-                is_video = False
-                try:
-                    video_play =  browser.find_element(By.CLASS_NAME, 'play-icon')
-                    if(video_play):
-                        is_video = True
-                except:
-                    print('khong co video')
+            # chuyển đổi title và description lại, tạo mới lại content
+            with ProcessPoolExecutor() as executor:
+                future1 = executor.submit(generate_title_description_improved, new_info['title'], new_info['description'])
+                future2 = executor.submit(generate_content_improved, new_info['content'], new_info['title'])
 
-                if not is_video:
-                    # Lấy thẻ meta có name="description"
-                    meta_title = browser.find_element("xpath", '//meta[@property="og:title"]')
-                    # Lấy giá trị của thuộc tính content
-                    title = str(meta_title.get_attribute("content"))
-                    title_mobile = str(meta_title.get_attribute("content"))
-                    print(title)
+                wait([future1, future2])
 
-                    # Lấy thẻ meta có name="description"
-                    meta_description = browser.find_element("xpath", '//meta[@name="description"]')
-                    # Lấy giá trị của thuộc tính content
-                    description = str(meta_description.get_attribute("content"))
-                    description_mobile = str(meta_description.get_attribute("content"))
-                    print(description)
-                   
-                    # Lấy thẻ meta có name="description"
-                    meta_tags = browser.find_element("xpath", '//meta[@property="article:tag"]')
-                    # Lấy giá trị của thuộc tính content
-                    tags = str(meta_tags.get_attribute("content"))
-                    print(tags)
+                result1 = future1.result()
+                result2 = future2.result()
 
-                    # remove ---
-                    browser.execute_script("""
-                        var elements = document.querySelectorAll('p.dcr-1xjndtj');
-                        for (var i = 0; i < elements.length; i++) {
-                            elements[i].parentNode.removeChild(elements[i]);
-                        }
-                    """)
-                    browser.execute_script("""
-                        var elements = document.querySelectorAll('div.dcr-cn68uf');
-                        for (var i = 0; i < elements.length; i++) {
-                            elements[i].parentNode.removeChild(elements[i]);
-                        }
-                    """)
-                     
+                # Gán lại kết quả vào new_info
+                new_info['title'] = result1['title']
+                new_info['description'] = result1['description']
+                new_info['content'] = result2
+                new_info['title_slug'] = slugify(new_info['title'])
 
-                    # contents
-                    main_body = browser.find_element(By.TAG_NAME, 'main')
-                    article = main_body.find_element(By.TAG_NAME, 'article')
-                    contents =  [element.text for element in article.find_elements(By.TAG_NAME, 'p')]
-                    content = " ".join(contents)
-                    content_mobile = " ".join(contents)
-                    print(content)
+            print(new_info)
+            # tạo thumbnail video
+            generate_thumbnail(
+                f"{path_folder}/image-0.jpg",
+                f"{path_folder}/image-blur-0.jpg",
+                person_info['person_img_path'],
+                f"{path_folder}/draf-thumbnail.jpg",
+                f"{path_folder}/thumbnail.jpg",
+                new_info['title'].replace('*', '')
+            )
 
-                    # images
-                    images = [element.get_attribute('src') for element in article.find_elements(By.CLASS_NAME, 'dcr-evn1e9')]
-                    images = [f"{src.split('?')[0]}?width=1920&dpr=1&s=none" for src in images if src is not None]
-                    if images.__len__() == 1:
-                        images.append(images[0])
-                    print(images)
+            # # save content to file txt
+            # with open(f"{path_folder}/result.txt", "w",  encoding="utf-8") as file:
+            #     # Viết vào file
+            #     file.write(f"link: {current_link}.\n")
+            #     file.write(f"title: {new_info['title']}\n")
+            #     file.write(f"title slug: {new_info['title_slug']}\n")
+            #     file.write(f"content: {new_info['content']}\n")
+            #     file.write(f"tags: {new_info['tags']}\n")
 
-                    # create folder to save files to edit video
-                    count_folder = count_folders('./videos')
-                    path_folder = f'./videos/video-{count_folder}'
-                    try:
-                        os.makedirs(path_folder)
-                    except:
-                        print('folder existed')
-                    
+            # tạo âm thanh video
+            print('generate voice-----------------')
+            generate_to_voice_edge(new_info['content'], f"{path_folder}/content-voice.mp3")
 
+            # concact content video ---------------------------------------
+            concat_content_videos(
+                './public/intro_ffmpeg.mp4',
+                f'./pic_affs/aff.mp4',
+                f"{path_folder}/content-voice.mp3",
+                f"{path_folder}/content-voice.aac",
+                path_videos,
+                f'{path_folder}/{new_info['title_slug']}.mp4',
+                f'{path_folder}/draf.mp4',
+                f'{path_folder}/draf2.mp4',
+            )
 
-                    # random number to get image and gif
-                    index_path = random.randint(0, 3)
-                    gif_path = gif_paths[index_path]
-                    person_img_path = person_img_paths[index_path]
+            # tạo link rút gọn
+            # short_link = create_shortened_link(current_link)
+            # if short_link is None:
+            #     raise Exception("Lỗi xảy ra, không thể tạo link rút gọn")
+            aff_text = ''
+            for item in products:
+                aff_text += f'{item['itemDes']}: {item['exeLink']}\n'
 
-                    #import images
-                    path_videos = []
-                    def process_image_and_video(item, key, path_folder):
-                        img_path = f"{path_folder}/image-{key}.jpg"
-                        img_blur_path = f"{path_folder}/image-blur-{key}.jpg"
-                        generate_image(item, img_path, img_blur_path)
-                        random_number = random.randint(5, 10)
-                        generate_video_by_image(
-                            1 if key % 2 == 0 else None,
-                            img_path,
-                            img_blur_path,
-                            f'{path_folder}/video-{key}.mp4',
-                            random_number,
-                            gif_path
-                        )
-                        return f"{path_folder}/video-{key}.mp4"
-                    
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        futures = []
-                        for key, item in enumerate(images):
-                            futures.append(
-                                executor.submit(process_image_and_video, item, key, path_folder)
-                            )
-                        
-                        path_videos = [future.result() for future in concurrent.futures.as_completed(futures)]
+            des_youtube = f"{new_info['description']}\n\n💡 Support us by using the short links below — just a few seconds of ads before the awesome deals!:\n{aff_text}\n\n(tags):\n{', '.join(new_info['tags'].split(','))}"
+            upload_yt(
+                "C:/Path/To/Chrome/news-us-news",
+                new_info['title'],
+                des_youtube,
+                f'news,{new_info['tags']},breaking news,current events,',
+                os.path.abspath(f'{path_folder}/{new_info['title_slug']}.mp4'),
+                os.path.abspath(f"{path_folder}/thumbnail.jpg"),
+            )
 
-                    # generate title by ai
-                    print('generate title')
-                    is_low_100 = False
-                    while is_low_100 is False:
-                        title = generate_content(f'hãy viết lại title bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, không được có dấu : trong title, trên 50 ký tự và dưới 100 ký tự để cho tôi đặt title cho video youtube của tôi: {title}, trả ra title cho tôi luôn, không cần phải ghi thêm gì hết.')
-                        if title.__len__() < 100:
-                            is_low_100 = True
-                    print(title)
-                    time.sleep(5)
-
-                    print('generate description')
-                    description = generate_content(f'tôi đang có title là: {title}. tag là: {tags}. description ban đầu là: {description}. Hãy viết lại description bằng tiếng anh sao cho hay và nổi bật, chuẩn seo, không được dài quá 250 ký tự, để cho tôi gắn vào phần mô tả cho video youtube của tôi: {description}, trả ra description cho tôi luôn, không cần phải ghi thêm gì hết.')
-                    print(description)
-                    time.sleep(5)
-
-                    if len(title) > 100:
-                        title = title[:100]
-                    title_slug = slugify(str(title))
-
-                    # generate content by ai
-                    print(f'generate content {content.__len__()}')
-
-                    content = generate_content(f'hãy viết lại content sau bằng tiếng anh sao cho hấp dẫn, và có độ dài ký tự là {content.__len__()}: {content}')
-                    print(content)
-                
-                    # generate tags
-                    # Chuyển chuỗi thành list các tag
-                    tag_list = tags.split(',')
-                    result = ""
-                    length = 0
-
-                    for tag in tag_list:
-                        if length + len(tag) + 2 <= 300:  
-                            result += tag + ", "
-                            length += len(tag) + 2
-                        else:
-                            break
-
-                    if result.endswith(", "):
-                        result = result[:-2]
-
-                    # generate thumbnail by ai
-                    print('generate thumbnail')
-                    generate_thumbnail(
-                        f"{path_folder}/image-0.jpg",
-                        f"{path_folder}/image-blur-0.jpg",
-                        person_img_path,
-                        f"{path_folder}/draf-thumbnail.jpg",
-                        f"{path_folder}/thumbnail.jpg",
-                        title.replace('*', '')
-                    )
-
-                    # save content to file txt
-                    print('write result txt')
-                    with open(f"{path_folder}/result.txt", "w",  encoding="utf-8") as file:
-                        # Viết vào file
-                        file.write(f"link: {current_link}.\n")
-                        file.write(f"title: {title}\n")
-                        file.write(f"title slug: {title_slug}\n")
-                        file.write(f"content: {content}\n")
-                        file.write(f"tags: {result}\n")
-
-                    # generate voice ---------------------------------------
-                    print('generate voice-----------------')
-                    is_generate_voice_success = generate_voice_kokoro_pip(content, f"{path_folder}/content-voice.mp3")
-
-                    if not is_generate_voice_success:
-                        print('generate voice error ....')
-                        music = pyglet.resource.media('public/reng.weba', streaming=False)
-                        player = pyglet.media.Player()
-                        player.queue(music)
-                        player.loop = True
-                        player.play()
-                        pyglet.app.run()
-
-
-                        is_generate_voice_error = True
-                        browser.quit()
-                        subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
-                        print('time hien tai')
-                        print(datetime.now())
-                        break
-
-                    if not is_generate_voice_success:
-                        print('generate voice error ....')
-                        music = pyglet.resource.media('public/reng.weba', streaming=False)
-                        player = pyglet.media.Player()
-                        player.queue(music)
-                        player.loop = True
-                        player.play()
-                        pyglet.app.run()
-
-
-                        is_generate_voice_error = True
-                        browser.quit()
-                        subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
-                        print('time hien tai')
-                        print(datetime.now())
-                        break
-                    
-                    # generate voice support
-                    print('generate voice support-----------------')
-                    is_generate_voice_success = generate_voice_kokoro_pip("Checking out some great-value, high-quality items in the video description.", f"./suport.mp3", 1.2)
-                    support_randoom = data_support
-                    random.shuffle(support_randoom)
-                    support_randoom = random.sample(support_randoom, 3)
-                    link_support_images = [item['link_img'] for item in support_randoom]
-                    list_discount = [item['discount'] for item in support_randoom]
-                    content_supports = "\n".join([item['content'] for item in support_randoom])
-
-                    # tạo video kêu gọi kiếm tiền
-                    create_video_support(
-                        './public/support.mp3',
-                        './public/bg/support.png',
-                        gif_path,
-                        './public/support.mp4',
-                        link_support_images,
-                        ['./public/support_1.png', './public/support_2.png', './public/support_3.png'],
-                        list_discount
-                    )
-
-
-                    
-                    # concact content video ---------------------------------------
-                    concact_content_videos(f"{path_folder}/content-voice.mp3",path_videos, f'{path_folder}/{title_slug}.mp4' )
-
-                    insert_link(current_link)
-                    browser.quit()
-                    
-                    print('upload video to youtube')
-                    des_youtube = f"{description}\n\n{content_supports}\n\n(tags):\n{result}"
-                    time.sleep(2)
-                    upload_yt(
-                        "C:/Path/To/Chrome/news-us",
-                        title,
-                        des_youtube,
-                        f'news, {result}, breaking news, current events,',
-                        os.path.abspath(f'{path_folder}/{title_slug}.mp4'),
-                        os.path.abspath(f"{path_folder}/thumbnail.jpg"),
-                    )
-                    print('upload video to youtube successfully')
-                    time.sleep(180)
-
-
-                else:
-                    insert_link(current_link)
-                    browser.quit()
-                    time.sleep(10)
-            # không có current link ----------------------------------------------
-            else:
-                print('không có tin tức mời, chờ 5 phút')
-                browser.quit()
-                time.sleep(60)
-        
-    except Exception as e:
-        print('Error')
-        print(e)
-        print(NameError)
-        dir_path = Path(f'{path_folder}/result.txt')
-        if not dir_path.is_file() and not is_generate_voice_error:
+            
+            print('upload video to youtube successfully')
             insert_link(current_link)
-        subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], check=True)
+            print(new_info)
+            time.sleep(60 * 20)     
+        except Exception as e:
+            print(current_link)
+            print(f'loi xay ra: {e}')
+            if current_link is not None:
+                insert_link(current_link)
+            else:
+                time.sleep(60 * 20)
+
+
+if __name__ == "__main__":
+    main()

@@ -6,10 +6,13 @@ def connect_db(name = 'mydatabase.db'):
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS links 
                     (id INTEGER PRIMARY KEY, url TEXT)''')
+    
 
     conn.commit()
     conn.close()
 
+
+# -------------- links news
 def get_all_links(name = 'mydatabase.db'):
     conn = sqlite3.connect(name)
     cursor = conn.cursor()
@@ -21,6 +24,8 @@ def get_all_links(name = 'mydatabase.db'):
     conn.close()
 
     return result
+
+
 
 def check_link_exists(url, name = 'mydatabase.db'):
     conn = sqlite3.connect(name)

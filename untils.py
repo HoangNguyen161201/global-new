@@ -16,6 +16,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import Select
 from webdriver_manager.chrome import ChromeDriverManager
 import base64
 import ffmpeg
@@ -25,196 +26,90 @@ import random
 import textwrap
 import pillow_avif
 from io import BytesIO
-
-# # nếu sử dụng https://github.com/zboyles/Kokoro-82M.git
-# os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
-# os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG\espeak-ng.exe"
-# from Kokoro.models import build_model
-# import torch
-# # 3️⃣ Call generate, which returns 24khz audio and the phonemes used
-# from Kokoro.kokoro import generate
+from bs4 import BeautifulSoup
+from tqdm import tqdm
+import re
+import uuid
+import pyperclip
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import shutil
+from bson import ObjectId
 
 # # nếu tải pip install kokoro
 from kokoro import KPipeline
 from moviepy import AudioFileClip, concatenate_audioclips
 import soundfile as sf
-
-def generate_content(content):
-    genai.configure(api_key="AIzaSyArae1nyjhAiRedUMkrUWd7p_-BJglXBNU")
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content(content)
-    return response.text
-
-def generate_to_voice(content, path):
-    async def main() -> None:
-        c = edge_tts.Communicate(content, edge_voice_data[6], rate="+5%", pitch="+20Hz")
-        await c.save(path)
-    asyncio.run(main())
-
-def resize_to_cover(image, target_width, target_height):
-    # Get the original dimensions
-    original_height, original_width = image.shape[:2]
-    
-    # Calculate the aspect ratios
-    target_aspect = target_width / target_height
-    original_aspect = original_width / original_height
-    
-    # Determine the scaling factor and dimensions to cover the target area
-    if original_aspect > target_aspect:
-        # Image is wider than target, scale by height
-        scale = target_height / original_height
-    else:
-        # Image is taller than target, scale by width
-        scale = target_width / original_width
-    
-    # Resize the image
-    new_width = int(original_width * scale)
-    new_height = int(original_height * scale)
-    resized_image = cv2.resize(image, (new_width, new_height))
-    
-    # Calculate the cropping coordinates
-    x_center = new_width // 2
-    y_center = new_height // 2
-    x_crop = target_width // 2
-    y_crop = target_height // 2
-    
-    # Crop the image to the target dimensions
-    cropped_image = resized_image[y_center - y_crop:y_center + y_crop, x_center - x_crop:x_center + x_crop]
-    
-    return cropped_image
-
-def generate_image(link, out_path, out_blur_path, width = None, height = None):
-    response = requests.get(link)
-    if response.status_code == 200:
-        with open(out_path, "wb") as f:
-            f.write(response.content)
-    else:
-        print("Yêu cầu không thành công. Mã trạng thái:", response.status_code)
-
-    image = cv2.imread(out_path)
-    image = image[150:-150, 150:-150]
-    blurred_image_edit = None
-    if width is not None and height is not None:
-        blurred_image_edit  = resize_to_cover(image, width, height)
-    else:
-        image = cv2.flip(image, 1)
-    border_thickness = 25
-    border_color = (255, 255, 255)
-    blurred_image_edit_2 = cv2.copyMakeBorder(blurred_image_edit if blurred_image_edit is not None else image, border_thickness, border_thickness, border_thickness, border_thickness, cv2.BORDER_CONSTANT, value=border_color)
-    image = cv2.copyMakeBorder(image, border_thickness, border_thickness, border_thickness, border_thickness, cv2.BORDER_CONSTANT, value=border_color)
-
-    # Làm mờ hình ảnh bằng Blur
-    blurred_image = cv2.GaussianBlur(blurred_image_edit_2, (0, 0), 15)
-
-    cv2.imwrite(out_path, image)
-    cv2.imwrite(out_blur_path, blurred_image)
-
-def generate_video_by_image(zoom_in, in_path, blur_in_path, out_path, second, gif_path, is_short = False):
-    clip_image = ImageClip(in_path).with_duration(second)
-    clip_blurred_image = ImageClip(blur_in_path, duration= second).resized((1080, 1920) if is_short else (1920, 1080))
-    clip_blurred_image = clip_blurred_image.resized(lambda t: 1 + 0.3 * t/second)
-
-    if not zoom_in:
-        w_clip_image, h_clip_image = clip_image.size
-        percent = (960 / w_clip_image) if (960 / w_clip_image) * h_clip_image < 720 else (720 / h_clip_image)
-        if is_short:
-            percent = (720 / w_clip_image) if (720 / w_clip_image) * h_clip_image < 960 else (960 / h_clip_image)
-        clip_image = clip_image.resized((percent * w_clip_image, percent * h_clip_image))
-        clip_image = clip_image.resized(lambda t: 1 + 0.4 * t/second)
-    else:
-        w_clip_image, h_clip_image = clip_image.size
-        percent = ((1920 - 60) / w_clip_image) if ((1920 - 60) / w_clip_image) * h_clip_image < 1020 else (1020 / h_clip_image)
-        if is_short:
-            percent = (1020 / w_clip_image) if (1020 / w_clip_image) * h_clip_image < (1920 - 60) else ((1920 - 60) / h_clip_image)
-        clip_image = clip_image.resized((percent * w_clip_image, percent * h_clip_image))
-        clip_image = clip_image.resized(lambda t: 1 - 0.3 * t/second)
-    
-    # add gif
-    gif = VideoFileClip(gif_path, has_mask= True)
-    percent_gif = 0.8 
-    gif = gif.resized((int(1920 * percent_gif), int(1080 * percent_gif)))
-    while gif.duration < second:
-        gif = concatenate_videoclips([gif, gif])
-    gif = gif.subclipped(0, second)
-
-    
-    # Tạo avatar clip
-    avatar_clip = ImageClip('./public/avatar.png').resized((200, 200))
-    avatar_clip = avatar_clip.with_opacity(0.7)
-    avatar_clip = avatar_clip.with_position((830 if is_short else 1650,  50))
-
-    final_clip = CompositeVideoClip([
-        clip_blurred_image.with_position('center'),
-        clip_image.with_position('center'),
-        gif.with_position((0, 1080 if is_short else 250)),
-        avatar_clip.with_duration(second)
-        ])
-
-    final_clip.write_videofile(out_path, fps=24)
-
-def wrap_text(text, width=50):
-    return "\n".join(textwrap.wrap(text, width=width))
-def concact_content_videos(audio_path, video_path_list, out_path, is_short = False, title_mobile_options = None):
-    # Load âm thanh
-    audio = AudioFileClip(audio_path)
-    audio_duration = audio.duration
-
-    # intro video
-    intro = VideoFileClip('./public/intro.mp4')
-    intro_audio = AudioFileClip(title_mobile_options['title_audio'] if is_short else './public/intro.mp4')
-    intro = intro.resized((1080, 1920) if is_short else (1920, 1080))
-    intro_duration =  intro.duration
-
-    # video suport chưa sửa cho short, chỉ cho long
-    support = VideoFileClip('./public/support.mp4')
-    support_audio = AudioFileClip('./public/support.mp4')
-    support = support.resized((1080, 1920) if is_short else (1920, 1080))
-    support_duration =  support.duration
-    final_duration = audio_duration + intro_duration + support_duration
+from data import gif_paths, person_img_paths, gemini_keys
 
 
-    duration_video = 0
-    index = 0
-    videos = [] if is_short else [intro, support]
 
-    bg_mobile_img = Image.open('./public/bg/bg-mobile-1.png').convert("RGBA")
-    bg_mobile_array = np.array(bg_mobile_img)
-    bg_mobile = ImageClip(bg_mobile_array, duration= 5, is_mask = False, transparent = True)  # Không cố định thời gian ở đây
-    bg_mobile = bg_mobile.with_position((0, -700))
- 
-    bg_mobile = bg_mobile.with_duration(intro.duration)
+# lấy tất cả các link có trong tin tức
+def get_all_link_in_theguardian_new():
+    url = 'https://www.theguardian.com/world'
+    headers = {
+        'User-Agent': 'Mozilla/5.0'
+    }
 
-    while duration_video < final_duration:
-        video = VideoFileClip(video_path_list[index])
-        if(duration_video + video.duration > final_duration):
-            duration_end_video =  duration_video + video.duration - final_duration
-            video = video.subclipped(0, duration_end_video)
-            duration_video += duration_end_video
-        else:
-            duration_video += video.duration
-        videos.append(video)
-        if(index + 1 == video_path_list.__len__()):
-            index = 0
-        else:
-            index += 1
-
-    # Nối video lại với nhau
-    final_video = concatenate_videoclips(videos).subclipped(0, final_duration)
-    # Ghép video và âm thanh lại với nhau
-    final_video = final_video.with_audio(concatenate_audioclips([intro_audio, support_audio, audio]))
-    final_video.write_videofile('./mobile.mp4' if is_short else out_path)
-    final_video.close()
-
-    if(is_short):
-        name_clip = TextClip(text = wrap_text(title_mobile_options['title'], 20), interline = 10, font_size=70, font="./fonts/arial/arial.ttf",  size=(2000, None), text_align="center").with_position(("center", 330)).with_duration(intro_duration).with_start(0)
-        # pronunciation_clip = TextClip(text = wrap_text(animal_options['pronunciation'].upper(), 100), interline = 10, font_size=50, font="C:/Windows/Fonts/Arial.ttf", color='white',  size=(2000, None), text_align="center", stroke_color="black", stroke_width=3).with_position(("center", 730)).with_duration(duration).with_start(0)
-
-        video = VideoFileClip('./mobile.mp4')
-        final_video = CompositeVideoClip([video, bg_mobile, name_clip])
-        final_video.write_videofile(out_path)
-        final_video.close()
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    link = []
+    # Lọc các thẻ <a> thỏa điều kiện
+    for a in soup.find_all('a', href=True):
+        data_link = a.get('data-link-name', '')
+        if 'card-@1' in data_link and 'live' not in data_link:
+            link.append(a['href'])
+    return link
 
 
+# lấy thông tin của tin tức bao gồm title, des, tags, content, img
+def get_info_new(url):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0'
+        }
+
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # title, description and content
+        title = None
+        meta_tag = soup.find('meta', attrs={'property': 'og:title'})
+        if meta_tag:
+            title = meta_tag.get('content', None)
+
+        description = None
+        meta_tag = soup.find('meta', attrs={'name': 'description'})
+        if meta_tag:
+            description = meta_tag.get('content', None)
+
+        tags = None
+        meta_tag = soup.find('meta', attrs={'property': 'article:tag'})
+        if meta_tag:
+            tags = meta_tag.get('content', None)
+
+        content = soup.find('div', {'id': 'maincontent'}).get_text()
+
+        # pictures
+        pictures = soup.find_all('picture', class_='dcr-evn1e9')
+        picture_links = []
+        for item in pictures:
+            source = item.find(['source', 'img'], srcset = True)
+            picture_links.append(source['srcset'])
+        if(picture_links.__len__() == 0 or content is None or content is None or content is None or content is None):
+            return None
+        
+        return {
+            "content": content,
+            "title": title,
+            "description": description,
+            "tags": tags,
+            "picture_links": picture_links
+        }
+    except:
+      return None
+
+# đếm số lượng thư mục có trong thư mục chính
 def count_folders(path):
     # Kiểm tra xem đường dẫn tồn tại không
     if not os.path.exists(path):
@@ -225,6 +120,342 @@ def count_folders(path):
     folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
     return len(folders)
 
+# # lấy ngẫu nhiên đường dẫn hình ảnh và hình động người thuyết trình
+def get_img_gif_person():
+    index_path = random.randint(0, 3)
+    return {
+        'person_img_path': person_img_paths[index_path],
+        'person_gif_path': gif_paths[index_path]    
+    } 
+
+# tải và tạo ra hình ảnh gốc và hình ảnh mờ 
+def generate_image(link, out_path, out_blur_path, width=1920, height=1080):
+    def resize_to_fit(image, max_width, max_height):
+        h, w = image.shape[:2]
+        scale = min(max_width / w, max_height / h, 1.0)  # chỉ scale nhỏ
+        return cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+    response = requests.get(link)
+    if response.status_code != 200:
+        print("Yêu cầu không thành công. Mã trạng thái:", response.status_code)
+        return
+
+    with open(out_path, "wb") as f:
+        f.write(response.content)
+
+    image = cv2.imread(out_path)
+    image = image[150:-150, 150:-150]
+
+    # === ẢNH BLUR ===
+    blurred = cv2.resize(image, (1920, 1080), interpolation=cv2.INTER_AREA)
+    blurred = cv2.copyMakeBorder(blurred, 25, 25, 25, 25, cv2.BORDER_CONSTANT, value=(255, 255, 255))
+    blurred = cv2.GaussianBlur(blurred, (0, 0), 15)
+
+    # === ẢNH CHÍNH ===
+    image_resized = resize_to_fit(image, 1840, 1000)
+    image_with_border = cv2.copyMakeBorder(image_resized, 25, 25, 25, 25, cv2.BORDER_CONSTANT, value=(255, 255, 255))
+
+    # Ghi kết quả
+    cv2.imwrite(out_path, image_with_border)
+    cv2.imwrite(out_blur_path, blurred)
+
+
+# tạo ra các phần nhỏ video từ hình ảnh đã tải về
+def generate_video_by_image(zoom_in, in_path, blur_in_path, out_path, second, gif_path):
+    width, height = 1920, 1080
+    duration = second
+
+    os.makedirs('./temp', exist_ok=True)
+
+    cmd = [
+        'ffmpeg',
+        '-y',
+        '-loop', '1', '-t', str(duration), '-i', blur_in_path,           # [0] blur background
+        '-loop', '1', '-t', str(duration), '-i', in_path,                # [1] foreground
+        '-stream_loop', '-1', '-i', gif_path,                            # [2] gif looped
+        '-loop', '1', '-t', str(duration), '-i', './public/avatar.png',  # [3] avatar
+        '-filter_complex',
+        f"""
+        [0:v]setsar=1,setpts=PTS-STARTPTS[bg];
+        [1:v]setsar=1,setpts=PTS-STARTPTS[fg];
+        [2:v]scale={int(width*0.8)}:{int(height*0.8)},trim=duration={duration},setpts=PTS-STARTPTS[gif];
+        [3:v]scale=200:200,format=rgba,colorchannelmixer=aa=0.7,setsar=1[avatar];
+        [bg][fg]overlay=(W-w)/2:(H-h)/2[tmp1];
+        [tmp1][gif]overlay=0:250[tmp2];
+        [tmp2][avatar]overlay=1650:50
+        """.replace('\n', ''),
+        '-t', str(duration),
+        '-r', '24',
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        out_path
+    ]
+
+    # === Run FFmpeg with progress ===
+    process = subprocess.Popen(
+        cmd,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+
+    total_frames = duration * 24
+    pbar = tqdm(total=total_frames, desc="Rendering", unit="frame")
+
+    for line in process.stderr:
+        if "frame=" in line:
+            parts = line.strip().split()
+            for part in parts:
+                if part.startswith("frame="):
+                    try:
+                        frame_number = int(part.split('=')[1])
+                        pbar.n = frame_number
+                        pbar.refresh()
+                    except:
+                        pass
+    pbar.close()
+
+    process.wait()
+    if process.returncode != 0:
+        raise Exception("FFmpeg failed")
+
+
+# tạo lại title và description
+def generate_title_description_improved(title, description):
+    while True:
+        title_des = generate_content(f'''tôi đang có các thông tin như sau:
+                                    - title: {title}
+                                    - description: {description}
+                                    hãy generate lại các thông tin trên cho tôi bằng tiếng anh sao cho hay và nổi bật, chuẩn seo youtube.
+                                    Trả ra dưới định dạng như sau:
+                                    Dòng 1: là title (trên 50 ký tự và không quá 100 ký tự, không được có dấu : trong title).
+                                    Từ dòng thứ 2 trở đi: là description. 
+                                    Trả ra kết quả cho tôi luôn, không cần phải giải thích hay ghi thêm gì hết.''',
+                                    api_key= gemini_keys[2]
+                        )
+        
+        lines = title_des.splitlines()
+        title_line = lines[0].strip()
+        if len(title_line) < 100:
+            desc = "\n".join(lines[1:]).strip()
+            desc = re.sub(r'[ \t]+', ' ', desc)
+            return {
+                "title": title_line,
+                "description": desc
+            }
+
+# tạo lại nội dung content
+def generate_content_improved(content, title):
+    return generate_content(f'''
+        Tôi có một bản tin mới. Hãy viết lại bằng tiếng Anh sao cho hấp dẫn, súc tích và phù hợp để đọc lên trong một video tin tức trên YouTube (voice-over). Nội dung cần được viết dưới dạng khách quan ở ngôi thứ ba, không dùng "I", "my", "we", hay bất kỳ đại từ ngôi thứ nhất nào.
+        title là: {title},
+        Nội dung là: {content}
+
+        Yêu cầu:
+        - độ dài ký tự bằng hoặc trên {content.__len__()} ký tự.
+        - Viết thành một đoạn văn liền mạch, không chia cảnh, không dùng markdown, không có dấu *, **, hoặc [Scene:].
+        - Phong cách giống người dẫn bản tin truyền hình, mang tính tường thuật khách quan nhưng thu hút, gây tò mò và khơi gợi cảm xúc.
+        - Không thêm bất kỳ lời giải thích nào. Chỉ trả về nội dung đã viết lại.
+        ''', api_key= gemini_keys[2])
+        
+        
+
+
+# tạo voice thông qua microsoft voice
+def generate_to_voice_edge(content: str, output_path: str, voice: str = "en-US-AriaNeural", rate="+5%", pitch="-5Hz", chunk_size=500):
+    def split_text_by_dot(text, max_length):
+        sentences = text.split(".")
+        chunks = []
+        current = ""
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(current) + len(sentence) + 1 <= max_length:
+                current += sentence + ". "
+            else:
+                chunks.append(current.strip())
+                current = sentence + ". "
+        if current:
+            chunks.append(current.strip())
+        return chunks
+
+    async def _run():
+        temp_dir = "__temp_voice_edge__"
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_files = []
+
+        chunks = split_text_by_dot(content, chunk_size)
+
+        for i, chunk in enumerate(tqdm(chunks, desc="TTS Chunks")):
+            file_path = os.path.join(temp_dir, f"chunk_{i}_{uuid.uuid4().hex}.mp3")
+            tts = edge_tts.Communicate(text=chunk, voice=voice, rate=rate, pitch=pitch)
+            await tts.save(file_path)
+            temp_files.append(file_path)
+
+        # Tạo concat list
+        concat_path = os.path.join(temp_dir, "concat.txt")
+        with open(concat_path, "w", encoding="utf-8") as f:
+            for file in temp_files:
+                f.write(f"file '{os.path.abspath(file).replace('\\', '/')}'\n")
+
+        print("🔊 Merging audio files...")
+        process = subprocess.Popen(
+            [
+                "ffmpeg", "-f", "concat", "-safe", "0",
+                "-i", concat_path,
+                "-c", "copy", "-y", output_path
+            ],
+            stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
+
+        for line in tqdm(process.stderr, desc="Merging", unit="line"):
+            pass
+
+        process.wait()
+
+        # Cleanup
+        for file in temp_files + [concat_path]:
+            try: os.remove(file)
+            except: pass
+        try: os.rmdir(temp_dir)
+        except: pass
+
+        print(f"✅ Done! Saved to {output_path}")
+
+    asyncio.run(_run())
+
+
+def normalize_audio(input_audio, output_audio):
+    command = [
+        "ffmpeg", "-y",
+        "-i", input_audio,
+        "-ac", "2",
+        "-ar", "44100",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        output_audio
+    ]
+    subprocess.run(command)
+
+# gắn âm thanh vào video
+def import_audio_to_video(in_path, out_path, audio_duration, audio_path):
+    command = [
+        "ffmpeg", "-y",
+        "-i", in_path,
+        "-i", audio_path,
+        "-t", str(audio_duration),
+        "-filter:v", "scale=1920:1080,fps=30",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-preset", "fast",
+        out_path
+    ]
+    subprocess.run(command)
+
+# hoàn thành video
+def concat_content_videos(intro_path, short_link_path, audio_path, audio_out_path, video_path_list, out_path, draf_out_path, draf_out_path_2):
+    # Load âm thanh
+    audio = AudioFileClip(audio_path)
+    audio_duration = audio.duration
+
+    duration_video = 0
+    index = 0
+    video_path_list_concat = []
+
+    normalize_audio(audio_path, audio_out_path)
+
+    while duration_video < audio_duration:
+        video = VideoFileClip(video_path_list[index])
+        video_path_list_concat.append(video_path_list[index])
+        duration_video += video.duration
+        if(index + 1 == video_path_list.__len__()):
+            index = 0
+        else:
+            index += 1
+        video.close()
+
+    # Tạo file danh sách tạm thời
+    list_file = "video_list.txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for path in video_path_list_concat:
+            f.write(f"file '{os.path.abspath(path)}'\n")
+
+    # nối các video lại với nhau
+    command = [
+        "ffmpeg",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", list_file,
+        "-c", "copy",
+        draf_out_path,
+        "-progress", "-",
+        "-nostats"
+    ]
+
+    # Chạy và hiển thị tiến trình
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in process.stdout:
+        line = line.strip()
+        if line.startswith("frame=") or "out_time=" in line or "progress=" in line:
+            print(line)
+
+    process.wait()
+
+    # cắt đúng duration và gắn âm thanh
+    import_audio_to_video(draf_out_path, draf_out_path_2, audio_duration, audio_out_path)
+
+
+    # nối intro với video
+    with open(list_file, "w", encoding="utf-8") as f:
+        f.write(f"file '{os.path.abspath(intro_path)}'\n")
+        f.write(f"file '{os.path.abspath(short_link_path)}'\n")
+        f.write(f"file '{os.path.abspath(draf_out_path_2)}'\n")
+
+    command = [
+        "ffmpeg",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", list_file,
+        "-c:v", "libx264",       # Re-encode video
+        "-c:a", "aac",           # Re-encode audio
+        "-b:a", "192k",          # Bitrate audio
+        "-preset", "fast",
+        out_path
+    ]
+
+    subprocess.run(command)
+    os.remove(list_file)
+    audio.close()
+
+def normalize_video(input_path, output_path):
+    """Chuẩn hóa 1 video để tránh lỗi concat."""
+    command = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-c:a", "aac",            # Chuyển âm thanh về codec aac
+        "-b:a", "192k",           # Bitrate âm thanh
+        "-ar", "44100",           # Tần số mẫu 44100Hz
+        "-ac", "2", 
+        "-vf", "fps=30,format=yuv420p",
+        "-af", "aresample=async=1",
+        "-preset", "fast",
+        "-crf", "23",
+        output_path
+    ]
+
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+# dùng gemini để tạo content
+def generate_content(content, model='gemini-1.5-flash', api_key= gemini_keys[0]):
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model)
+    response = model.generate_content(content)
+    return response.text
+
+
+# tạo ra thumbnail
 def generate_thumbnail(img_path, img_blur_path, img_person_path, draf_path, out_path, text):
     text = text.upper()
     # Mở ảnh thứ nhất (ảnh nền chính)
@@ -313,25 +544,9 @@ def generate_thumbnail(img_path, img_blur_path, img_person_path, draf_path, out_
     jpg_image.paste(png_image, (0, 0), png_image)
     jpg_image.save(out_path)
 
-from datetime import datetime, timedelta
 
-class TimeManager:
-    current_time = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(hours=20)
-
-    @staticmethod
-    def reset_to_current_time():
-        TimeManager.current_time = datetime.combine(datetime.today(), datetime.min.time()) + timedelta(hours=16)
-        print(f"Thời gian đã được reset: {TimeManager.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-
-    @staticmethod
-    def add_30_minutes():
-        new_time = TimeManager.current_time + timedelta(minutes=30)
-        TimeManager.current_time = new_time
-        print(f"Thời gian sau khi cộng 30 phút: {TimeManager.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-
-
-
-def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbnail, is_short = False):
+# đẩy lên youtube
+def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbnail, comment = None):
     ### dùng để tạo ra 1 user
     # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
     # user_data_dir = "C:/Path/To/Chrome/news-us"
@@ -375,15 +590,15 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     file_input.send_keys(video_path)
     time.sleep(3)
 
-    if is_short is False:
-        # upload thumbnail
-        print('upload thumbnail in youtube')
-        WebDriverWait(browser, 10).until(
-            EC.presence_of_all_elements_located((By.ID, 'file-loader'))
-        )
-        thumbnail_input = browser.find_element(By.ID, 'file-loader')
-        thumbnail_input.send_keys(video_thumbnail)
-        time.sleep(3)
+
+    # upload thumbnail
+    print('upload thumbnail in youtube')
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'file-loader'))
+    )
+    thumbnail_input = browser.find_element(By.ID, 'file-loader')
+    thumbnail_input.send_keys(video_thumbnail)
+    time.sleep(3)
 
 
     # enter title
@@ -402,7 +617,11 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     des_input = browser.find_elements(By.ID, 'textbox')[1]
     des_input.clear()
     time.sleep(1)
-    des_input.send_keys(description)
+    # Copy vào clipboard
+    pyperclip.copy(description)
+    des_input.click()
+    time.sleep(1)
+    des_input.send_keys(Keys.CONTROL, 'v')
     time.sleep(1)
 
     # enter hiển thị thêm
@@ -467,50 +686,6 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     browser.find_element(By.ID, 'next-button').click()
     time.sleep(2)
 
-    # chọn upload trực tiếp hay lên lịch
-    current_time = datetime.now()
-    current_hour = current_time.hour
-
-    # # Đặt khoảng thời gian từ 17:00 đến 08:00
-    # if (current_hour >= 16 or current_hour < 6) or is_short:
-    #     if is_short is False:
-    #         TimeManager.reset_to_current_time()
-    #     print('Upload trực tiếp')
-    # else:
-    #     print('lên lịch upload')
-    #     schedule_datetime = TimeManager.current_time
-    #     formatted_date = schedule_datetime.strftime("%b %d, %Y")  # Thí dụ: "Feb 23, 2025"
-    #     formatted_time = schedule_datetime.strftime("%I:%M %p")   # Thí dụ: "01:00 AM"
-    #     print(f'lên lịch upload {formatted_date} {formatted_time}')
-    #     WebDriverWait(browser, 10).until(
-    #         EC.presence_of_all_elements_located((By.ID, 'second-container-expand-button'))
-    #     )
-    #     browser.find_element(By.ID, 'second-container-expand-button').click()
-    #     time.sleep(2)
-    #     WebDriverWait(browser, 10).until(
-    #         EC.presence_of_all_elements_located((By.XPATH, "//tp-yt-paper-input[@id='textbox']//input[@class='style-scope tp-yt-paper-input']"))
-    #     )
-    #     time_input = browser.find_element(By.XPATH, "//tp-yt-paper-input[@id='textbox']//input[@class='style-scope tp-yt-paper-input']")
-    #     time_input.clear()
-    #     time_input.send_keys(formatted_time)
-    #     time.sleep(2)
-    #     WebDriverWait(browser, 10).until(
-    #         EC.presence_of_all_elements_located((By.ID, 'right-icon'))
-    #     )
-    #     browser.find_element(By.ID, 'right-icon').click()
-    #     time.sleep(1)
-    #     WebDriverWait(browser, 10).until(
-    #         EC.presence_of_all_elements_located((By.XPATH, "//tp-yt-paper-input[@aria-label='Enter date']//input[@class='style-scope tp-yt-paper-input']"))
-    #     )
-    #     date_input = browser.find_element(By.XPATH, "//tp-yt-paper-input[@aria-label='Enter date']//input[@class='style-scope tp-yt-paper-input']")
-    #     date_input.clear()
-    #     date_input.send_keys(formatted_date)
-    #     time.sleep(1)
-    #     date_input.send_keys(Keys.RETURN)
-    #     time.sleep(2)
-    #     TimeManager.add_30_minutes()
-        
-        
 
     # done
     print('upload video in youtube thành công')
@@ -519,280 +694,480 @@ def upload_yt( user_data_dir, title, description, tags, video_path, video_thumbn
     )
     browser.find_element(By.ID, 'done-button').click()
 
+    # vào youtube để nhập bình luận
+    if comment is not None:
+        WebDriverWait(browser, 100).until(
+            EC.presence_of_all_elements_located((By.ID, 'share-url'))
+        )
+        link_redirect = browser.find_element(By.ID, 'share-url')
+        href = link_redirect.get_attribute('href')
+        browser.get(href)
+        WebDriverWait(browser, 100).until(
+            EC.presence_of_all_elements_located((By.ID, 'above-the-fold'))
+        )
+        time.sleep(5)
+        is_Find_comment = False
+        while  is_Find_comment is False:
+            try:
+                browser.execute_script("window.scrollBy(0, 50);")
+                time.sleep(1)
+                comment_box = browser.find_element(By.ID, 'simplebox-placeholder')
+                if(comment_box):
+                    is_Find_comment = True
+                time.sleep(3)
+            except:
+                time.sleep(3)
+
+        comment_box = browser.find_element(By.ID, 'simplebox-placeholder')
+        comment_box.click()
+        textarea = WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div#contenteditable-root[contenteditable='true']"))
+        )
+        pyperclip.copy(comment)
+        textarea.click()
+        time.sleep(1)
+        textarea.send_keys(Keys.CONTROL, 'v')
+        time.sleep(2)
+        submit_button = WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located((By.ID, "submit-button"))
+        )
+        submit_button.click()
+
     time.sleep(10)
     browser.quit()
 
-
-def split_text(text, max_length=500):
-    sentences = text.split('.')
-    segments = []
-    current_segment = ''
-    
-    for sentence in sentences:
-        # Thêm dấu chấm bị loại bỏ trong quá trình split
-        sentence = sentence.strip() + '.'
-        
-        # Kiểm tra nếu thêm câu hiện tại vào sẽ vượt quá giới hạn
-        if len(current_segment) + len(sentence) > max_length:
-            segments.append(current_segment.strip())
-            current_segment = sentence
-        else:
-            current_segment += ' ' + sentence
-    
-    # Thêm đoạn cuối cùng vào danh sách
-    if current_segment:
-        segments.append(current_segment.strip())
-    
-    return segments
-
-
-
-def generate_voice_google(text, out_path, url):
-    is_success = True
+def create_shortened_link(original_url, api_key = '660f5cdd35747f5488cd1c93c0980afdf7385a71') -> str | None:
     try:
-        split_texts = split_text(text, 500)
-        audio_paths = []
-
-        for key, item in enumerate(split_texts):
-            try_generate = 0
-            while try_generate < 3:
-                print(try_generate)
-                # Dữ liệu JSON cần gửi
-                payload = {
-                    "input": {
-                        "text": item
-                    },
-                    "voice": {
-                        "languageCode": "en-US",
-                        "name": "en-US-Journey-F"
-                    },
-                    "audioConfig": {
-                        "audioEncoding": "LINEAR16",
-                        "pitch": 0,
-                        "speakingRate": 1,
-                        "effectsProfileId": ["small-bluetooth-speaker-class-device"]
-                    }
-                }
-
-
-                headers = {
-                    'accept': '*/*',
-                    'accept-language': 'en-US,en;q=0.9,vi;q=0.8',
-                    'content-type': 'text/plain;charset=UTF-8'
-                }
-
-                # Gửi yêu cầu POST
-                response = requests.post(url, headers=headers, json=payload )
-
-                # Kiểm tra mã trạng thái và in ra phản hồi
-                if response.status_code == 200:
-                    print(f'generate voice {key} success')
-                    audio_data = base64.b64decode(response.json()['audioContent'])
-                    with open(f'./audio-{key}.mp3', 'wb') as file:
-                        file.write(audio_data)
-                    audio_paths.append(f'./audio-{key}.mp3')
-                    break
-                else:
-                    print(response)
-                    print('generate voice error')
-                    if(try_generate + 1 == 3):
-                        is_success = False
-                    try_generate += 1
-                        
-
-        clips = [AudioFileClip(audio) for audio in audio_paths]
-        final_clip = concatenate_audioclips(clips)
-        final_clip.write_audiofile(out_path)
-        return is_success
-    except:
-        return False
-
-# def generate_voice_kokoro(text, out_path):
-#     try:
-#         text_arr = split_text(text, 500)
-#         audio_paths = []
-#         for key, item in enumerate(text_arr):
-#             audio_path = f'./audio-{key}.mp3'
-#             audio_paths.append(audio_path)
-
-#             device = 'cuda' if torch.cuda.is_available() else 'cpu'
-#             MODEL = build_model('./Kokoro/kokoro-v0_19.pth', device)
-#             VOICE_NAME = [
-#                 'af', # Default voice is a 50-50 mix of Bella & Sarah
-#                 'af_bella', 'af_sarah', 'am_adam', 'am_michael',
-#                 'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
-#                 'af_nicole', 'af_sky',
-#             ][0]
-#             VOICEPACK = torch.load(f'./Kokoro/voices/{VOICE_NAME}.pt', weights_only=True).to(device)
-#             print(f'Loaded voice: {VOICE_NAME}')
-
-#             audio, out_ps = generate(MODEL, item, VOICEPACK, lang=VOICE_NAME[0])
-
-#             process = (
-#                             ffmpeg
-#                             .input('pipe:0', format='f32le', ac=1, ar='24000')  # Định dạng đầu vào
-#                             .output(audio_path, acodec='libmp3lame', audio_bitrate='192k')
-#                             .overwrite_output()
-#                             .run_async(pipe_stdin=True)
-#                         )
-
-#             # Gửi dữ liệu âm thanh vào ffmpeg
-#             process.stdin.write(audio.astype(np.float32).tobytes())
-#             process.stdin.close()
-#             process.wait()
-
-#         clips = [AudioFileClip(audio) for audio in audio_paths]
-#         final_clip = concatenate_audioclips(clips)
-#         final_clip.write_audiofile(out_path)
-#         return True
-            
-#     except NameError:
-        
-#       print('An exception occurred')
-#       print(NameError)
-#       return False
-    
-def generate_voice_kokoro_pip(text, out_path, speed= 1):
-    try:
-        print('generate voice')
-        pipeline = KPipeline(lang_code='a') # <= make sure lang_code matches voice
-
-        generator = pipeline(
-            text, voice='af_heart', # <= change voice here
-            speed=speed, split_pattern=r'\n+'
+        response = requests.get(
+            "https://exe.io/api",
+            params={"api": api_key, "url": original_url},
+            timeout=10
         )
+        data = response.json()
 
-        audio_paths = []
-        for i, (gs, ps, audio) in enumerate(generator):
-            audio_path = f"./audio_{i}.wav"
-            audio_paths.append(audio_path)
-            
-            sf.write(audio_path, audio, 24000)
+        if data.get("status") == "success" and "shortenedUrl" in data:
+            return data["shortenedUrl"]
+        else:
+            return None
+    except Exception as e:
+        return None
+    
+# đẩy lên youtube
+def upload_rumble( user_data_dir, title, description, tags, video_path, video_thumbnail):
+    ### dùng để tạo ra 1 user
+    # chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe"
+    # user_data_dir = "C:/Path/To/Chrome/news-us"
+    # subprocess.Popen([chrome_path, f'--remote-debugging-port=9223', f'--user-data-dir={user_data_dir}'])
+    # time.sleep(5)
 
-        clips = [AudioFileClip(audio) for audio in audio_paths]
-        final_clip = concatenate_audioclips(clips)
-        final_clip.write_audiofile(out_path)
-        return True
-    except:
-      print('generate voice error')
-      return False 
 
-def process_image_support(
-    input_url,
-    output_path,
-    discount=0,
-    fixed_width=410,
-    max_height=650,
-    border_width=10,
-    border_color='#CDCDCD',
-    corner_radius=20,
-):
-    # Tải ảnh
-    response = requests.get(input_url)
-    img = Image.open(BytesIO(response.content)).convert("RGBA")
+    # Tạo đối tượng ChromeOptions
+    chrome_options = Options()
 
-    # Tính lại size để KHÔNG CROP và KHÔNG MÉO
-    original_width, original_height = img.size
-    scale_w = fixed_width / original_width
-    scale_h = max_height / original_height
-    scale = min(scale_w, scale_h)
+    # Chỉ định đường dẫn đến thư mục user data
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    chrome_options.add_argument(f"user-data-dir={user_data_dir}")
+    chrome_options.add_argument("profile-directory=Default")  # Nếu bạn muốn sử dụng profile mặc định
+    # chrome_options.add_argument("--headless")  # Chạy trong chế độ không giao diện
+    # chrome_options.add_argument("--disable-gpu")  # Tắt GPU (thường dùng trong môi trường máy chủ)
 
-    new_width = int(original_width * scale)
-    new_height = int(original_height * scale)
+    # Sử dụng Service để chỉ định ChromeDriver
+    service = Service(ChromeDriverManager().install())
 
-    img = img.resize((new_width, new_height), Image.LANCZOS)
 
-    # Bo góc
-    mask = Image.new('L', (new_width, new_height), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.rounded_rectangle([0, 0, new_width, new_height], radius=corner_radius, fill=255)
-    rounded_img = Image.new("RGBA", (new_width, new_height))
-    rounded_img = Image.composite(img, rounded_img, mask)
+    # Khởi tạo WebDriver với các tùy chọn
+    browser = webdriver.Chrome(service=service, options=chrome_options)
 
-    # Thêm viền ngoài
-    bordered_width = new_width + 2 * border_width
-    bordered_height = new_height + 2 * border_width
-    bordered_img = Image.new("RGBA", (bordered_width, bordered_height), (0, 0, 0, 0))
+    browser.get("https://rumble.com/upload.php")
 
-    draw = ImageDraw.Draw(bordered_img)
-    draw.rounded_rectangle(
-        [0, 0, bordered_width, bordered_height],
-        radius=corner_radius + border_width,
-        fill=border_color
+    # await browser load end
+    WebDriverWait(browser, 100).until(
+        EC.presence_of_all_elements_located((By.ID, 'Filedata'))
     )
-    bordered_img.paste(rounded_img, (border_width, border_width), mask=mask)
 
-    # Nếu có discount
+    # đẩy video lên
+    file_input = browser.find_element(By.ID, 'Filedata')
+    file_input.send_keys(video_path)
+    time.sleep(3)
+
+    WebDriverWait(browser, 100).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, 'num_percent'))
+    )
+
+    is_100_percent = False
+    while is_100_percent is False:   
+        top_percent = browser.find_element(By.CLASS_NAME, 'num_percent')
+        top_percent_text = top_percent.text
+
+        # Kiểm tra có chứa '100%' hay không
+        if "100%" in top_percent_text:
+            is_100_percent = True
+        time.sleep(1)
+
+
+    # enter title
+    print('nhập title in youtube')
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'title'))
+    )
+    title_input = browser.find_element(By.ID, 'title')
+    title_input.clear()
+    time.sleep(1)
+    title_input.send_keys(title)
+    time.sleep(1)
+
+    # enter description
+    print('nhập description in youtube')
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'description'))
+    )
+    des_input = browser.find_element(By.ID, 'description')
+    des_input.clear()
+    time.sleep(1)
+    # Copy vào clipboard
+    pyperclip.copy(description)
+    des_input.click()
+    time.sleep(1)
+    des_input.send_keys(Keys.CONTROL, 'v')
+    time.sleep(1)
+
    
-    badge_radius = 48
-    badge_diameter = badge_radius * 2
-    badge_position = (bordered_width - badge_diameter - 10, 10)
+    #chọn tài khoản để đẩy video
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'channelId_0'))
+    )
+    account_checkbox = browser.find_element(By.ID, 'channelId_0')
+    browser.execute_script("arguments[0].click();", account_checkbox)
+    time.sleep(1)
 
-    # Vẽ hình tròn trắng
-    draw.ellipse(
-        [badge_position[0], badge_position[1], badge_position[0] + badge_diameter, badge_position[1] + badge_diameter],
-        fill="white"
+    # chọn news category
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, 'select-search-input'))
+    ) 
+
+    input_element = WebDriverWait(browser, 10).until(
+        EC.element_to_be_clickable((By.CLASS_NAME, "select-search-input"))
+    )
+    input_element.click()
+
+    option_element = WebDriverWait(browser, 10).until(
+        EC.element_to_be_clickable((By.XPATH, '//div[@class="select-option" and @data-label="News"]'))
+    )
+    option_element.click()
+    time.sleep(3)
+
+    # upload thumbnail
+    print('upload thumbnail in youtube')
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'customThumb'))
+    )
+    thumbnail_input = browser.find_element(By.ID, 'customThumb')
+    thumbnail_input.send_keys(video_thumbnail)
+    time.sleep(3)
+    
+    # enter tags
+    print('nhập tags in youtube')
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'tags'))
+    )
+    tags_input = browser.find_element(By.ID, 'tags')
+    tags_input.send_keys(tags)
+    time.sleep(2)
+
+    # Scroll xuống cuối cùng của phần tử scrollable-content
+    browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)
+
+    # nhấn nút tiếp tục
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'submitForm'))
+    )
+    submitForm = browser.find_element(By.ID, 'submitForm')
+    submitForm.click()
+
+    # chấp nhật các mọi quyền của rumble
+    time.sleep(3)
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'crights'))
+    )
+    checkbox = browser.find_element(By.ID, 'crights')
+    browser.execute_script("arguments[0].click();", checkbox)
+    time.sleep(1)
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'cterms'))
+    )
+    checkbox = browser.find_element(By.ID, 'cterms')
+    browser.execute_script("arguments[0].click();", checkbox)
+
+    # Scroll xuống cuối cùng của phần tử scrollable-content
+    browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)
+
+    # nhấn nút tiếp tục
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_all_elements_located((By.ID, 'submitForm2'))
+    )
+    submitForm = browser.find_element(By.ID, 'submitForm2')
+    submitForm.click()
+    time.sleep(3)
+
+    WebDriverWait(browser, 100).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, 'upload-video-title'))
     )
 
-    # Vẽ text
+    is_success = False
+    while is_success is False:   
+        title_success = browser.find_element(By.CLASS_NAME, 'upload-video-title')
+        title_success_text = title_success.text
+
+        # Kiểm tra có chứa 'Upload, share and license your videos' hay không
+        if "Upload, share and license your videos" in title_success_text:
+            is_success = True
+        print('đợi')
+        time.sleep(1)
+    
+
+    time.sleep(5)
+    browser.quit()
+
+
+def insert_short_link_affiniate(cookie_string):
+    uri = "mongodb+srv://hoangdev161201:Cuem161201@cluster0.3o8ba2h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    # Create a new client and connect to the server
+    client = MongoClient(uri, server_api=ServerApi('1'))
+    db = client["news"]
+    collection = db["link_affs"]
+    
+    number_page = 1
+    url_index = random.randint(0, 2)
+    urls = ['https://portals.aliexpress.com/material/productRecommend.do?requireCouponCode=&freeShipping=&shipTo=US&currency=USD&language=en&pageSize=11&type=1&pageNum=',
+            'https://portals.aliexpress.com/material/productRecommend.do?requireCouponCode=&freeShipping=&shipTo=US&currency=USD&language=en&pageSize=11&type=2&pageNum=',
+            'https://portals.aliexpress.com/material/productRecommend.do?requireCouponCode=&freeShipping=&specialOffer=all_plan&shipTo=US&currency=USD&language=en&pageSize=11&type=1&pageNum='
+            ]
+    url_get_link_aff = 'https://portals.aliexpress.com/promote/promoteNow.do?trackingId=default&language=en_US&shipTo=US&currency=USD&subChannel=hd&productId='
+
+    # BƯỚC 2: Tách cookie thành dict để truyền vào requests
+    cookies = {}
+    for pair in cookie_string.split("; "):
+        if "=" in pair:
+            key, value = pair.split("=", 1)
+            cookies[key] = value
+    
+
+    # Danh sách kết quả rút gọn
+    simplified_items = []
+
+    while simplified_items.__len__() < 10:
+        url = f'{urls[url_index]}{number_page}'
+
+        response = requests.get(url, cookies=cookies)
+
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("data", {}).get("results", [])
+
+            simplified_items_state = []
+            for item in items:
+                simplified_items_state.append({
+                    "itemId": item.get("itemId"),
+                    "itemOriginPriceMin": item.get("itemOriginPriceMin"),
+                    "itemPriceDiscountMin": item.get("itemPriceDiscountMin"),
+                    "itemTitle": item.get("itemTitle"),
+                    "itemMainPic": item.get("itemMainPic"),
+                    "totalTranpro3Semantic": item.get("totalTranpro3Semantic"),
+                    "itemUrl": item.get("itemUrl"),
+                })
+            
+            item_ids = [item["itemId"] for item in simplified_items_state if item.get("itemId")]
+            
+            # tìm ra sản phẩm đã trùng
+            existing_docs = list(collection.find({"itemId": {"$in": item_ids}}))
+            existing_item_ids = {doc["itemId"] for doc in existing_docs}
+            simplified_items_state = [item for item in simplified_items_state if item.get("itemId") not in existing_item_ids]
+            
+            # lấy link affiniate
+            if simplified_items_state.__len__() > 0:
+                for key, item in enumerate(simplified_items_state):
+                    response = requests.get(f'{url_get_link_aff}{item['itemId']}', cookies=cookies)
+                    data = response.json()
+                    simplified_items_state[key]['affLink'] = data['data']['creativityCopywriters'][0]['promoteUrl']
+                    
+                    # tạo link exe
+                    short_link = create_shortened_link(simplified_items_state[key]['affLink'])
+                    simplified_items_state[key]['exeLink'] = short_link
+            simplified_items = simplified_items + simplified_items_state
+
+            print(simplified_items)
+            print(simplified_items.__len__())
+            if(simplified_items.__len__() < 10):
+                print('tiếp page tiếp theo')
+                number_page += 1
+        else:
+            print("Lỗi gọi API:", response.status_code)
+            return
+    if(simplified_items.__len__() >= 10):
+        collection.insert_many(simplified_items)
+
+# tạo image để gắn affiniate --------------------------------------------------
+def download_and_resize_image(url, size=(399, 399), save_path='output.jpg'):
     try:
-        font = ImageFont.truetype("arial.ttf", 40)
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # báo lỗi nếu không tải được
+        image = Image.open(BytesIO(response.content)).convert('RGB')
+        
+        # Resize theo kích thước cố định (có thể méo hình nếu không đúng tỷ lệ)
+        image_resized = image.resize(size)
+
+        image_resized.save(save_path)
+        print(f"✅ Saved resized image to {save_path}")
+    except Exception as e:
+        print(f"❌ Error processing {url}: {e}")
+
+def add_rounded_corners(image: Image.Image, radius: int) -> Image.Image:
+    # Tạo mặt nạ hình tròn
+    rounded_mask = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(rounded_mask)
+    draw.rounded_rectangle([0, 0, *image.size], radius=radius, fill=255)
+
+    # Áp dụng mask vào ảnh
+    rounded_image = image.copy()
+    rounded_image.putalpha(rounded_mask)
+
+    return rounded_image
+
+def generate_image_and_video_aff_and_get_three_item(gif_path):
+    uri = "mongodb+srv://hoangdev161201:Cuem161201@cluster0.3o8ba2h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    # Create a new client and connect to the server
+    client = MongoClient(uri, server_api=ServerApi('1'))
+    db = client["news"]
+    collection = db["link_affs"]
+
+    path_folder = f'./pic_affs'
+    try:
+        shutil.rmtree(path_folder)
     except:
-        font = ImageFont.load_default()
-
-    text = f"-{discount}%" if discount > 0 else 'Hot'
-    bbox = font.getbbox(text)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    text_x = badge_position[0] + (badge_diameter - text_width) // 2
-    text_y = badge_position[1] + (badge_diameter - text_height) // 2 - 1
-
-    for dx in [-1, 0, 1]:
-        for dy in [-1, 0, 1]:
-            draw.text((text_x + dx, text_y + dy), text, font=font, fill="red")
-
-    bordered_img.save(output_path)
-
-def create_video_support(audio_path, bg_path, gif_path, out_path, list_image_path= [], list_image_out_paths= [], list_discount= [] ):
-    generate_voice_kokoro_pip("if you want awesome products at great prices? Check out the in the description!", audio_path ,1.3)
+        print('next')
     
-    # Lấy thời lượng âm thanh
-    audio = AudioFileClip(audio_path)
-    duration = audio.duration
+    os.makedirs(path_folder)
 
-    # Resize hình nền về 1920x1080
-    background = ImageClip(bg_path).resized((1920, 1080)).with_duration(duration)
+    # Lấy ngẫu nhiên 3 item
+    random_items = list(collection.aggregate([
+        {"$sample": {"size": 3}}
+    ]))
 
-
-    for index, item in enumerate(list_image_path):
-        process_image_support(item, list_image_out_paths[index], list_discount[index])
-
-    # Tạo danh sách các ImageClip với vị trí tương ứng
-    coordinates = [(200, 245), (715, 245), (1230, 245)]
-    pictures = [
-        ImageClip(image).with_position(coord).with_duration(duration)
-        for image, coord in zip(list_image_out_paths, coordinates)
-    ]
-
-    # add gif
-    gif = VideoFileClip(gif_path, has_mask= True)
-    percent_gif = 0.8 
-    gif = gif.resized((int(1920 * percent_gif), int(1080 * percent_gif)))
-    while gif.duration < duration:
-        gif = concatenate_videoclips([gif, gif])
-    gif = gif.subclipped(0, duration)
+    # In kết quả
+    for i, item in enumerate(random_items):
+        download_and_resize_image(item['itemMainPic'], save_path= f'{path_folder}/pic_{i}.png')
 
 
-    # Ghép hình nền và avatar
-    video = CompositeVideoClip([background] + pictures + [gif.with_position((0, 250))], size=(1920, 1080))
+    try:
+        background = Image.open('./public/bg/aff.png').convert("RGB")
+        draw = ImageDraw.Draw(background)
 
-
+        
+        font = ImageFont.truetype("./fonts/arial/arial.ttf", 35)
+        font2 = ImageFont.truetype("./fonts/arial/arial.ttf", 29)
+        font3 = ImageFont.truetype("./fonts/arial/ARIBL0.ttf", 40)
     
 
+        for i, item in enumerate(random_items):
+            foreground = Image.open(f'{path_folder}/pic_{i}.png').convert("RGBA")
+            foreground = add_rounded_corners(foreground, 11)
+            x = 367 + 498 * i
+            y = 240
+            background.paste(foreground, (x, y), foreground)
+            
+            title = item['itemTitle']
+            if len(title) > 30:
+                title = title[:20] + "..."
 
-    # Gắn âm thanh vào video
-    final = video.with_audio(audio)
+            
 
-    # Xuất video
-    final.write_videofile(out_path, fps=24)
+            # Vẽ chữ phía dưới ảnh
+            draw.text((x, y + foreground.height + 25), title, fill=(0, 0, 0), font=font)
+            draw.text((x, y + foreground.height + 80), f'{item['totalTranpro3Semantic']} Sold', fill=(128, 128, 128), font=font2)
+            draw.text((x, y + foreground.height + 130), f'{item['itemPriceDiscountMin']}', fill=(255, 99, 71), font=font3)
+            bbox = draw.textbbox((0, 0), f"{item['itemPriceDiscountMin']}", font=font3)
+            text_width = bbox[2] - bbox[0] + 20
+            draw.text((x + text_width, y + foreground.height + 145), f'{item['itemOriginPriceMin']}', fill=(96, 96, 96), font=font2)
+            text_x = x + text_width
+            text_y = y + foreground.height + 145
+            line_y = text_y + 32 // 2
+            bbox = draw.textbbox((0, 0), f"{item['itemOriginPriceMin']}", font=font2)
+            text_width = bbox[2] - bbox[0]
+            draw.line((text_x, line_y, text_x + text_width, line_y), fill=(64, 64, 64), width=1)
+        background.save(f'{path_folder}/pic_result.png')
 
+        audio = AudioFileClip('./public/aff.aac')
+
+        generate_video_by_image(None,
+                        f'{path_folder}/pic_result.png',
+                        f'{path_folder}/pic_result.png',
+                        f'{path_folder}/daft.mp4',
+                        audio.duration,
+                        gif_path
+                    )
+
+        import_audio_to_video(f'{path_folder}/daft.mp4', f'{path_folder}/aff.mp4', audio.duration,  './public/aff.aac')
+        print(audio.duration)
+        
+        audio.close()
+        print("✅ Done")
+
+        return random_items
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+def update_des_for_aff():
+    uri = "mongodb+srv://hoangdev161201:Cuem161201@cluster0.3o8ba2h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    # Create a new client and connect to the server
+    client = MongoClient(uri, server_api=ServerApi('1'))
+    db = client["news"]
+    collection = db["link_affs"]
+
+    # Tìm các document KHÔNG có trường 'itemDes'
+    items_without_itemDes = list(collection.find({ "itemDes": { "$exists": False } }, {
+        '_id': 1,
+        'itemTitle': 1
+    }))
+
+    if(items_without_itemDes.__len__() == 0):
+        raise Exception("Tất cả link đã thêm hết des")
+
+    # gemini_keys[6]
+    data = generate_content(f'''tôi có dữ liệu là: {items_without_itemDes}.
+                                Hiện tại tôi đang có kênh tin tức chính trị, tôi muốn bạn hãy viết     
+                            Tôi muốn bạn hãy viêt mô tả, tính năng hoặc ghi sao cho để thu hút các đối tượng coi tin tức chính trị trên youtube của tôi muốn nhấn vào link affiniate của tôi cho từng sản phẩn.
+                            Để cho từng sản phẩm để tôi có thể gắn vào description video youtube để kêu gọi họ nhấn vào link affiniate của tôi.
+                            ghi bằng tiếng anh và độ dài ký tự của mỗi mô tả sản phẩm không quá 130 ký tự.
+                            trả ra theo định dạng:
+                            dòng 1: id-mô tả sản phẩm 1
+                            dòng 2: id-mô tả sản phẩm 2
+                            dòng 3: id-mô tả sản phẩm 3
+                            trả ra theo đúng định dạng, không ghi thêm hoặc giải thích gì hết.
+                            ''', api_key= gemini_keys[6])
+    
+
+    # Tìm vị trí của tất cả các ID (24 ký tự hex + '-')
+    id_positions = [(m.start(), m.group(0)) for m in re.finditer(r'[a-f0-9]{24}-', data)]
+
+    items = []
+    for i in range(len(id_positions)):
+        start_pos, full_id = id_positions[i]
+        end_pos = id_positions[i + 1][0] if i + 1 < len(id_positions) else len(data)
+
+        _id = full_id[:-1]  # Bỏ dấu '-'
+        description = data[start_pos + 25:end_pos].strip()
+
+        items.append({ "_id": _id, "itemDes": description })
+
+    for i in range(len(items)):
+        collection.update_one(
+            {"_id": ObjectId(items[i]["_id"])},
+            {"$set": {"itemDes": items[i]["itemDes"]}}
+        )
+    
+    print(f'update success {items.__len__()}')
+
+    
