@@ -342,15 +342,17 @@ def normalize_audio(input_audio, output_audio):
 def import_audio_to_video(in_path, out_path, audio_duration, audio_path):
     command = [
         "ffmpeg", "-y",
-        "-i", in_path,
-        "-i", audio_path,
-        "-t", str(audio_duration),
-        "-filter:v", "scale=1920:1080,fps=30",
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-preset", "fast",
-        out_path
+        "-i", in_path,               # Đường dẫn video đầu vào
+        "-i", audio_path,            # Đường dẫn âm thanh đầu vào
+        "-t", str(audio_duration),   # Đặt thời gian cho video theo độ dài âm thanh
+        "-filter:v", "scale=1920:1080,fps=30",  # Bộ lọc video
+        "-c:v", "libx264",           # Sử dụng codec video h.264
+        "-c:a", "aac",               # Sử dụng codec âm thanh AAC
+        "-b:a", "192k",              # Cài đặt bitrate âm thanh
+        "-preset", "fast",           # Cài đặt preset nhanh
+        "-map", "0:v:0",             # Chỉ định video từ stream đầu tiên (video)
+        "-map", "1:a:0",             # Chỉ định audio từ stream thứ hai (audio)
+        out_path                     # Đường dẫn đầu ra
     ]
     subprocess.run(command)
 
@@ -410,7 +412,8 @@ def concat_content_videos(intro_path, short_link_path, audio_path, audio_out_pat
     # nối intro với video
     with open(list_file, "w", encoding="utf-8") as f:
         f.write(f"file '{os.path.abspath(intro_path)}'\n")
-        f.write(f"file '{os.path.abspath(short_link_path)}'\n")
+        if short_link_path is not None:
+            f.write(f"file '{os.path.abspath(short_link_path)}'\n")
         f.write(f"file '{os.path.abspath(draf_out_path_2)}'\n")
 
     command = [
@@ -1082,20 +1085,35 @@ def generate_image_and_video_aff_and_get_three_item(gif_path):
                 title = title[:20] + "..."
 
             
+            percent = ''
+            match = re.search(r'\d+(\.\d+)?', item['itemOriginPriceMin'])
+            match2 = re.search(r'\d+(\.\d+)?', item['itemPriceDiscountMin'])
+            if match and match2:
+                number1 = float(match.group())
+                number2 = float(match2.group())
+                percent = f'-{round(number2 / number1 * 100, 0)}%'
+
 
             # Vẽ chữ phía dưới ảnh
             draw.text((x, y + foreground.height + 25), title, fill=(0, 0, 0), font=font)
             draw.text((x, y + foreground.height + 80), f'{item['totalTranpro3Semantic']} Sold', fill=(128, 128, 128), font=font2)
-            draw.text((x, y + foreground.height + 130), f'{item['itemPriceDiscountMin']}', fill=(255, 99, 71), font=font3)
-            bbox = draw.textbbox((0, 0), f"{item['itemPriceDiscountMin']}", font=font3)
-            text_width = bbox[2] - bbox[0] + 20
-            draw.text((x + text_width, y + foreground.height + 145), f'{item['itemOriginPriceMin']}', fill=(96, 96, 96), font=font2)
-            text_x = x + text_width
-            text_y = y + foreground.height + 145
-            line_y = text_y + 32 // 2
-            bbox = draw.textbbox((0, 0), f"{item['itemOriginPriceMin']}", font=font2)
-            text_width = bbox[2] - bbox[0]
-            draw.line((text_x, line_y, text_x + text_width, line_y), fill=(64, 64, 64), width=1)
+            draw.rounded_rectangle(
+                [(x + 230, y), (x + 230 + 170, y + 65)],
+                radius=15,  # độ cong của góc
+                fill=(255, 255, 255),
+                outline=(210, 210, 210)
+            )
+            draw.text((x + 240, y), percent, fill=(255, 0, 0), font=font3)
+            # draw.text((x, y + foreground.height + 130), f'{item['itemPriceDiscountMin']}', fill=(255, 99, 71), font=font3)
+            # bbox = draw.textbbox((0, 0), f"{item['itemPriceDiscountMin']}", font=font3)
+            # text_width = bbox[2] - bbox[0] + 20
+            # draw.text((x + text_width, y + foreground.height + 145), f'{item['itemOriginPriceMin']}', fill=(96, 96, 96), font=font2)
+            # text_x = x + text_width
+            # text_y = y + foreground.height + 145
+            # line_y = text_y + 32 // 2
+            # bbox = draw.textbbox((0, 0), f"{item['itemOriginPriceMin']}", font=font2)
+            # text_width = bbox[2] - bbox[0]
+            # draw.line((text_x, line_y, text_x + text_width, line_y), fill=(64, 64, 64), width=1)
         background.save(f'{path_folder}/pic_result.png')
 
         audio = AudioFileClip('./public/aff.aac')

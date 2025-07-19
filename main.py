@@ -115,10 +115,16 @@ def main():
             #                     AudioFileClip('./public/short-link.aac').duration + 1,
             #                     './public/short-link.aac'
             #                     )
-            products = generate_image_and_video_aff_and_get_three_item(person_info['person_gif_path'])
 
-            if(products is None):
-                raise Exception("Lỗi xảy ra, không thể tạo và lấy ra 3 product ngẫu nhiên")
+            # products = generate_image_and_video_aff_and_get_three_item(person_info['person_gif_path'])
+            # if(products is None):
+            #     raise Exception("Lỗi xảy ra, không thể tạo và lấy ra 3 product ngẫu nhiên")
+            # nswf
+            import_audio_to_video(f'./public/nsfw/nsfw.mp4',
+                f'{path_folder}/nsfw.mp4',
+                AudioFileClip('./public/nsfw/nsfw.aac').duration + 1,
+                './public/nsfw/nsfw.aac'
+            )
 
             # chuyển đổi title và description lại, tạo mới lại content
             with ProcessPoolExecutor() as executor:
@@ -161,9 +167,19 @@ def main():
             generate_to_voice_edge(new_info['content'], f"{path_folder}/content-voice.mp3")
 
             # concact content video ---------------------------------------
+            # concat_content_videos(
+            #     './public/intro_ffmpeg.mp4',
+            #     f'./pic_affs/aff.mp4',
+            #     f"{path_folder}/content-voice.mp3",
+            #     f"{path_folder}/content-voice.aac",
+            #     path_videos,
+            #     f'{path_folder}/{new_info['title_slug']}.mp4',
+            #     f'{path_folder}/draf.mp4',
+            #     f'{path_folder}/draf2.mp4',
+            # )
             concat_content_videos(
                 './public/intro_ffmpeg.mp4',
-                f'./pic_affs/aff.mp4',
+                f'{path_folder}/nsfw.mp4',
                 f"{path_folder}/content-voice.mp3",
                 f"{path_folder}/content-voice.aac",
                 path_videos,
@@ -172,15 +188,19 @@ def main():
                 f'{path_folder}/draf2.mp4',
             )
 
+
             # tạo link rút gọn
             # short_link = create_shortened_link(current_link)
             # if short_link is None:
             #     raise Exception("Lỗi xảy ra, không thể tạo link rút gọn")
-            aff_text = ''
-            for item in products:
-                aff_text += f'{item['itemDes']}: {item['exeLink']}\n'
+         
+            # aff_text = ''
+            # for item in products:
+            #     aff_text += f'{item['itemDes']}: {item['exeLink']}\n'
 
-            des_youtube = f"{new_info['description']}\n\n💡 Support us by using the short links below — just a few seconds of ads before the awesome deals!:\n{aff_text}\n\n(tags):\n{', '.join(new_info['tags'].split(','))}"
+            # des_youtube = f"{new_info['description']}\n\n💡 Support us by using the short links below — just a few seconds of ads before the awesome deals!:\n{aff_text}\n\n(tags):\n{', '.join(new_info['tags'].split(','))}"
+            des_youtube = f"{new_info['description']}\n\nJoin my Patreon to discover unique artworks that I don't share publicly. For just $1, you'll get access to exclusive sketches and special pieces!\n👉 https://www.patreon.com/LenaStudio\n\n(tags):\n{', '.join(new_info['tags'].split(','))}"
+            
             upload_yt(
                 "C:/Path/To/Chrome/news-us-news",
                 new_info['title'],
@@ -189,6 +209,14 @@ def main():
                 os.path.abspath(f'{path_folder}/{new_info['title_slug']}.mp4'),
                 os.path.abspath(f"{path_folder}/thumbnail.jpg"),
             )
+            # upload_rumble(
+            #     "C:/Path/To/Chrome/news-us-news",
+            #     new_info['title'],
+            #     des_youtube,
+            #     f'news, {', '.join(new_info['tags'].split(','))}, breaking news, current events',
+            #     os.path.abspath(f'{path_folder}/{new_info['title_slug']}.mp4'),
+            #     os.path.abspath(f"{path_folder}/thumbnail.jpg"),
+            # )
 
             
             print('upload video to youtube successfully')
