@@ -72,12 +72,14 @@ def main():
 
             current_link = f'https://www.theguardian.com/{current_link}'
 
-            # lấy thông tin của video
-            new_info = get_info_new(current_link)
-
             # nếu không có thông tin tin tức thì bắn lỗi
             if (current_link is None):
                 raise Exception("Lỗi xảy ra, không có link")
+            
+            # lấy thông tin của video
+            new_info = get_info_new(current_link)
+
+
 
             # lấy ngẫu nhiên đường dẫn hình ảnh và hình động người thuyết trình
             person_info = get_img_gif_person()
